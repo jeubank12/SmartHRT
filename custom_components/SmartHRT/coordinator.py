@@ -246,8 +246,9 @@ class SmartHRTCoordinator:
                 stored_value = stored_data.get(storage_key)
 
                 if stored_value is None:
-                    # Use default value if not in storage
-                    setattr(self.data, attr_name, default_value)
+                    # Use default value if not in storage (None means keep current value)
+                    if default_value is not None:
+                        setattr(self.data, attr_name, default_value)
                 elif field_type == "datetime":
                     # Parse ISO format datetime strings
                     try:
@@ -256,6 +257,13 @@ class SmartHRTCoordinator:
                         )
                     except (ValueError, TypeError):
                         setattr(self.data, attr_name, default_value)
+                elif field_type == "time":
+                    # Parse time strings (HH:MM:SS or HH:MM)
+                    try:
+                        setattr(self.data, attr_name, self._parse_time(stored_value))
+                    except (ValueError, TypeError):
+                        # Keep current value if parsing fails
+                        pass
                 else:
                     # Direct assignment for float, bool, str
                     setattr(self.data, attr_name, stored_value)
@@ -286,6 +294,9 @@ class SmartHRTCoordinator:
 
             if field_type == "datetime":
                 # Serialize datetime to ISO format string
+                data_to_store[storage_key] = value.isoformat() if value else None
+            elif field_type == "time":
+                # Serialize time to HH:MM:SS string
                 data_to_store[storage_key] = value.isoformat() if value else None
             else:
                 # Direct storage for float, bool, str
@@ -1227,12 +1238,16 @@ class SmartHRTCoordinator:
         self._setup_time_triggers()  # Reconfigure les triggers
         self.calculate_recovery_time()
         self._notify_listeners()
+        # Persister la nouvelle valeur
+        self._hass.async_create_task(self._save_learned_data())
 
     def set_recoverycalc_hour(self, value: dt_time) -> None:
         """Définit l'heure de coupure chauffage"""
         self.data.recoverycalc_hour = value
         self._setup_time_triggers()  # Reconfigure les triggers
         self._notify_listeners()
+        # Persister la nouvelle valeur
+        self._hass.async_create_task(self._save_learned_data())
 
     def set_smartheating_mode(self, value: bool) -> None:
         self.data.smartheating_mode = value

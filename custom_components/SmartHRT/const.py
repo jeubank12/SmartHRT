@@ -72,9 +72,12 @@ DEFAULT_RECOVERYCALC_HOUR = "23:00:00"
 
 # ADR-004 & ADR-009: Mapping centralisé pour persistance hybride
 # Chaque tuple définit: (clé stockage, attribut data, valeur par défaut, type)
-# Les types supportés: "float", "bool", "str", "datetime" (sérialisé en isoformat)
+# Les types supportés: "float", "bool", "str", "datetime" (isoformat), "time" (HH:MM:SS)
 # Ce mapping est utilisé par coordinator._save/_restore_learned_data()
 PERSISTED_FIELDS: list[tuple[str, str, object, str]] = [
+    # Heures configurables (modifiables via l'interface)
+    ("target_hour", "target_hour", None, "time"),
+    ("recoverycalc_hour", "recoverycalc_hour", None, "time"),
     # Coefficients thermiques
     ("rcth", "rcth", DEFAULT_RCTH, "float"),
     ("rpth", "rpth", DEFAULT_RPTH, "float"),
