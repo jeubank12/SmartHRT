@@ -30,6 +30,7 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.storage import Store
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.util import dt as dt_util
+from homeassistant.exceptions import ServiceNotFound
 
 from .const import (
     DOMAIN,
@@ -902,6 +903,14 @@ class SmartHRTCoordinator:
         entity_id = self._weather_entity_id
 
         try:
+            # Vérifier que le service existe avant de l'appeler
+            if not self._hass.services.has_service("weather", "get_forecasts"):
+                _LOGGER.debug(
+                    "%s Service weather.get_forecasts pas encore disponible (démarrage en cours)",
+                    self._log_prefix(),
+                )
+                return
+
             # Appeler le service weather.get_forecasts
             forecast_response = await self._hass.services.async_call(
                 "weather",
@@ -950,6 +959,11 @@ class SmartHRTCoordinator:
                                 self.data.temperature_forecast_avg,
                                 self.data.wind_speed_forecast_avg,
                             )
+        except ServiceNotFound:
+            _LOGGER.debug(
+                "%s Service weather.get_forecasts non disponible au démarrage",
+                self._log_prefix(),
+            )
         except Exception as ex:
             _LOGGER.warning(
                 "%s Erreur lors de la récupération des prévisions météo: %s",
