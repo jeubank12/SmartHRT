@@ -1,0 +1,87 @@
+id: 018
+title: "Identification des instances dans les logs"
+status: "Accepté"
+date: "2026-02-02"
+context: |
+  Lorsque plusieurs instances SmartHRT sont configurées sur le même serveur Home Assistant, 
+  les entrées de log deviennent difficiles à dissocier et à tracer jusqu'à leur source.
+
+  Exemple du problème :
+  ```
+  2026-02-02 10:00:00 INFO SmartHRT: Heure de coupure chauffage atteinte
+  2026-02-02 10:00:02 INFO SmartHRT: Heure de coupure chauffage atteinte
+  2026-02-02 10:00:05 INFO SmartHRT: Transition vers état DETECTING_LAG
+  ```
+
+  Il est impossible de déterminer quelle instance a généré quel log. Cela pose plusieurs problèmes :
+  - Le débogage devient difficile avec plusieurs instances simultanées
+  - Le suivi des transitions d'état est complexe et source d'erreur
+  - Le support utilisateur est compliqué par des logs peu clairs
+  - La corrélation d'événements entre instances est fastidieuse
+
+decision: |
+  Tous les logs de SmartHRT incluent désormais un préfixe d'instance au format :
+  ```
+  [NomInstance#EntryID] Message de log
+  ```
+
+  Où :
+  - `NomInstance` : le nom fourni par l'utilisateur lors de la configuration
+  - `EntryID` : les 8 premiers caractères de l'identifiant unique de la configuration (entry_id)
+
+  Implémentation :
+  1. Ajout de la méthode `_log_prefix()` au `SmartHRTCoordinator` retournant le préfixe formaté
+  2. Mise à jour de 22 appels `_LOGGER` dans `coordinator.py` pour inclure le préfixe en premier argument
+  3. Création du module `logging_helper.py` offrant la fonction `get_log_prefix()` pour réutilisation
+  4. Tous les logs (configuration, restauration, événements temporels, transitions d'état) incluent maintenant le préfixe
+
+consequences:
+  positive:
+    - Les logs d'instances différentes sont clairement dissociés et identifiables
+    - Filtrage facile des logs par instance (par nom ou par ID) dans les outils d'analyse
+    - Débogage indépendant et sans confusion de chaque instance
+    - Aucun impact sur les performances (génération négligeable du préfixe)
+    - Support utilisateur considérablement amélioré pour configurations multi-instances
+    - Extensibilité future vers d'autres composants (sensor.py, switch.py, etc.)
+  negative:
+    - Légère augmentation de la longueur des lignes de log (environ 20 caractères par ligne)
+    - Les futurs logs doivent suivre ce pattern pour la cohérence (pas automatisé)
+
+related_adrs:
+  - 001 # Enregistrement des décisions architecturales
+  - 003 # Machine à états explicite
+
+files:
+  modified:
+    - custom_components/SmartHRT/coordinator.py
+  created:
+    - custom_components/SmartHRT/logging_helper.py
+
+examples: |
+  **Avec une seule instance (Salon) :**
+  ```
+  [Salon#a1b2c3d4] Configuration - TSP=19.5°C, target_hour=06:00:00, recoverycalc_hour=23:00:00
+  [Salon#a1b2c3d4] Heure de coupure chauffage atteinte
+  [Salon#a1b2c3d4] Transition vers état DETECTING_LAG
+  [Salon#a1b2c3d4] Baisse de température détectée après 3600s de lag
+  [Salon#a1b2c3d4] Transition vers état MONITORING
+  ```
+
+  **Avec plusieurs instances (Salon + Chambre) :**
+  ```
+  [Salon#a1b2c3d4] Configuration - TSP=19.5°C, target_hour=06:00:00
+  [Chambre#e5f6g7h8] Configuration - TSP=18.0°C, target_hour=06:30:00
+  [Salon#a1b2c3d4] Heure de coupure chauffage atteinte
+  [Chambre#e5f6g7h8] Heure de coupure chauffage atteinte
+  [Salon#a1b2c3d4] Initialisation des constantes à 50
+  [Chambre#e5f6g7h8] Initialisation des constantes à 50
+  [Salon#a1b2c3d4] Transition vers état DETECTING_LAG
+  [Chambre#e5f6g7h8] Transition vers état DETECTING_LAG
+  [Chambre#e5f6g7h8] Baisse de température détectée après 2700s de lag
+  [Salon#a1b2c3d4] Baisse de température détectée après 3600s de lag
+  ```
+
+  Dans l'exemple multi-instances, on voit clairement :
+  - Les deux instances franchissent les mêmes étapes avec des timestamps différents
+  - Chaque log est attribué au bon instance par le préfixe unique
+  - Aucune ambiguïté même lors d'événements quasi-simultanés
