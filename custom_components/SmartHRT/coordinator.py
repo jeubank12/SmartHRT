@@ -236,6 +236,9 @@ class SmartHRTCoordinator:
                 self.data.recovery_update_hour = update_time
                 self._schedule_recovery_update(update_time)
 
+        # Restaurer les triggers et tâches périodiques selon l'état de la machine
+        await self._restore_state_after_restart()
+
     async def _restore_learned_data(self) -> None:
         """Restore learned coefficients and state from persistent storage.
 
@@ -324,6 +327,125 @@ class SmartHRTCoordinator:
         _LOGGER.debug(
             "%s Données apprises et état sauvegardés en stockage", self._log_prefix()
         )
+
+    async def _restore_state_after_restart(self) -> None:
+        """Restaure les triggers et tâches périodiques après redémarrage selon l'état.
+
+        Cette méthode garantit que tous les mécanismes de la machine à états
+        sont correctement reprogrammés après un redémarrage de Home Assistant,
+        évitant ainsi la perte de fonctionnalité selon l'état dans lequel
+        l'instance se trouvait avant le redémarrage.
+        """
+        current_state = self.data.current_state
+        now = dt_util.now()
+
+        _LOGGER.info(
+            "%s Restauration après redémarrage - État: %s",
+            self._log_prefix(),
+            current_state,
+        )
+
+        if current_state == SmartHRTState.DETECTING_LAG:
+            # État 2: En attente de baisse de température
+            # La surveillance périodique est déjà active via _periodic_update
+            _LOGGER.debug(
+                "%s État DETECTING_LAG restauré - Surveillance température active",
+                self._log_prefix(),
+            )
+
+        elif current_state == SmartHRTState.MONITORING:
+            # État 3: Surveillance nocturne avec calculs récurrents
+            # Reprogrammer les mises à jour périodiques de recovery_start_hour
+            if self.data.recovery_calc_mode and self.data.recovery_update_hour:
+                if self.data.recovery_update_hour > now:
+                    self._schedule_recovery_update(self.data.recovery_update_hour)
+                    _LOGGER.debug(
+                        "%s Trigger recovery_update_hour reprogrammé: %s",
+                        self._log_prefix(),
+                        self.data.recovery_update_hour,
+                    )
+                else:
+                    # Le trigger est dépassé, recalculer immédiatement
+                    _LOGGER.debug(
+                        "%s Trigger recovery_update_hour dépassé, recalcul immédiat",
+                        self._log_prefix(),
+                    )
+                    await self._async_on_recovery_update_hour()
+
+            # Reprogrammer le trigger de démarrage de relance si nécessaire
+            if self.data.recovery_start_hour:
+                if self.data.recovery_start_hour > now:
+                    self._schedule_recovery_start(self.data.recovery_start_hour)
+                    _LOGGER.debug(
+                        "%s Trigger recovery_start reprogrammé: %s",
+                        self._log_prefix(),
+                        self.data.recovery_start_hour,
+                    )
+                else:
+                    # L'heure de relance est dépassée, démarrer immédiatement
+                    _LOGGER.info(
+                        "%s Heure de relance dépassée pendant le redémarrage, démarrage immédiat",
+                        self._log_prefix(),
+                    )
+                    self.on_recovery_start()
+
+        elif current_state == SmartHRTState.RECOVERY:
+            # État 4: Moment de la relance - transition rapide vers HEATING_PROCESS
+            # Si on redémarre en plein milieu du moment de relance, passer directement
+            # à HEATING_PROCESS car la relance doit être en cours
+            _LOGGER.info(
+                "%s État RECOVERY restauré pendant redémarrage - Passage à HEATING_PROCESS",
+                self._log_prefix(),
+            )
+            self.data.current_state = SmartHRTState.HEATING_PROCESS
+            self.data.rp_calc_mode = True
+            await self._save_learned_data()
+
+        elif current_state == SmartHRTState.HEATING_PROCESS:
+            # État 5: Montée en température jusqu'à TSP
+            # La surveillance de température est déjà active via _check_temperature_thresholds
+            # qui est appelé dans _periodic_update
+            _LOGGER.debug(
+                "%s État HEATING_PROCESS restauré - Surveillance TSP active (rp_calc_mode=%s)",
+                self._log_prefix(),
+                self.data.rp_calc_mode,
+            )
+
+            # Vérifier si target_hour est dépassée
+            if self.data.target_hour:
+                target_dt = now.replace(
+                    hour=self.data.target_hour.hour,
+                    minute=self.data.target_hour.minute,
+                    second=0,
+                    microsecond=0,
+                )
+                if target_dt < now:
+                    # Target_hour est passée pendant le redémarrage
+                    _LOGGER.info(
+                        "%s Target_hour dépassée pendant le redémarrage - Fin de relance",
+                        self._log_prefix(),
+                    )
+                    if self.data.rp_calc_mode:
+                        self.on_recovery_end()
+
+        elif current_state == SmartHRTState.HEATING_ON:
+            # État 1: Journée normale, rien de spécial à restaurer
+            _LOGGER.debug(
+                "%s État HEATING_ON restauré - Fonctionnement normal",
+                self._log_prefix(),
+            )
+
+        else:
+            # État inconnu ou non géré
+            _LOGGER.warning(
+                "%s État inconnu après restauration: %s - Réinitialisation à HEATING_ON",
+                self._log_prefix(),
+                current_state,
+            )
+            self.data.current_state = SmartHRTState.HEATING_ON
+            await self._save_learned_data()
+
+        self._notify_listeners()
 
     def _setup_listeners(self) -> None:
         """Configure les listeners pour les capteurs"""

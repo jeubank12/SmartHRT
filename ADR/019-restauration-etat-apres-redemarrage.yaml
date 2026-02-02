@@ -1,0 +1,172 @@
+id: 019
+title: "Restauration complète de l'état de la machine à états après redémarrage"
+status: "Accepté"
+date: "2026-02-02"
+context: |
+  Lorsque Home Assistant redémarre, SmartHRT restaure l'état de la machine à états
+  depuis le stockage persistant (ADR-004, ADR-009). Cependant, la restauration était
+  incomplète : seuls les coefficients thermiques et l'état lui-même étaient restaurés,
+  mais pas les triggers temporels ni les tâches périodiques associées à chaque état.
+
+  Problèmes identifiés :
+  
+  **État DETECTING_LAG (État 2) :**
+  - La surveillance de température était active (via _periodic_update) ✅
+  - Pas de trigger spécifique à reprogrammer ✅
+  
+  **État MONITORING (État 3) :**
+  - Les mises à jour périodiques de recovery_start_hour étaient perdues ❌
+  - Le trigger recovery_update_hour n'était pas reprogrammé ❌
+  - Le trigger recovery_start_hour n'était pas reprogrammé ❌
+  - Impact : L'instance restait en mode "veille" sans mettre à jour les calculs
+  
+  **État RECOVERY (État 4) :**
+  - État transitoire très court (quelques secondes) ❌
+  - Si HA redémarre pendant ces secondes, l'instance reste bloquée en RECOVERY
+  - Pas de mécanisme pour passer automatiquement à HEATING_PROCESS
+  
+  **État HEATING_PROCESS (État 5) :**
+  - La surveillance de TSP était active (via _check_temperature_thresholds) ✅
+  - Mais si target_hour était dépassée pendant le redémarrage, on_recovery_end() 
+    n'était jamais appelé ❌
+  - Impact : RPth n'était pas calculé si le réveil avait lieu pendant le redémarrage
+  
+  **État HEATING_ON (État 1) :**
+  - Aucun trigger spécifique à restaurer ✅
+
+  Exemple de scénario problématique :
+  1. SmartHRT passe en état MONITORING à 23h00 (recoverycalc_hour)
+  2. Home Assistant redémarre à 01h00
+  3. Au redémarrage, l'état MONITORING est restauré
+  4. Mais recovery_update_hour n'est jamais reprogrammé
+  5. L'heure de relance n'est plus mise à jour dynamiquement
+  6. La relance démarre avec un calcul obsolète ou ne démarre jamais
+
+decision: |
+  Création d'une méthode dédiée `_restore_state_after_restart()` appelée à la fin
+  de `async_setup()` qui analyse l'état courant et reprogramme tous les triggers
+  et tâches périodiques nécessaires.
+
+  **Implémentation par état :**
+
+  1. **DETECTING_LAG** : Rien de spécial, la surveillance est déjà active
+
+  2. **MONITORING** :
+     - Reprogrammer recovery_update_hour si non dépassé
+     - Si dépassé, appeler immédiatement _async_on_recovery_update_hour()
+     - Reprogrammer recovery_start_hour si non dépassé
+     - Si dépassé, appeler immédiatement on_recovery_start()
+
+  3. **RECOVERY** (état transitoire) :
+     - Passer directement à HEATING_PROCESS
+     - Activer rp_calc_mode
+     - Sauvegarder l'état
+
+  4. **HEATING_PROCESS** :
+     - Vérifier si target_hour est dépassée
+     - Si oui, appeler immédiatement on_recovery_end()
+     - Sinon, la surveillance automatique prend le relais
+
+  5. **HEATING_ON** : Rien de spécial
+
+  6. **État inconnu** : Log warning et réinitialisation à HEATING_ON
+
+  **Logs ajoutés :**
+  - INFO au début : "Restauration après redémarrage - État: {state}"
+  - DEBUG pour chaque trigger reprogrammé
+  - INFO pour les actions correctives (trigger dépassé, transition forcée)
+  - WARNING pour les états inconnus
+
+consequences:
+  positive:
+    - Reprise complète et cohérente après redémarrage dans tous les états
+    - Les calculs dynamiques (RCth, recovery_update) reprennent automatiquement
+    - Les triggers temporels manqués pendant le redémarrage sont gérés (déclenchement immédiat)
+    - La machine à états ne reste jamais bloquée dans un état incohérent
+    - Meilleure résilience face aux redémarrages fréquents (mises à jour HA, coupures)
+    - Logs détaillés pour diagnostiquer les problèmes de restauration
+  negative:
+    - Complexité accrue du code de setup (méthode supplémentaire ~120 lignes)
+    - Nécessite une compréhension approfondie de la machine à états pour maintenance
+    - Risque de comportement inattendu si les timestamps persistés sont incohérents
+  mitigation:
+    - Documentation extensive dans les commentaires du code
+    - Logs INFO/DEBUG pour chaque décision de restauration
+    - Tests manuels sur tous les états avant release
+    - ADR détaillant le comportement attendu pour chaque état
+
+related_adrs:
+  - 001 # Enregistrement des décisions architecturales
+  - 003 # Machine à états explicite
+  - 004 # Stratégie hybride de persistance
+  - 009 # Persistance des coefficients d'apprentissage
+  - 018 # Identification des instances dans les logs
+
+files:
+  modified:
+    - custom_components/SmartHRT/coordinator.py
+
+implementation_details: |
+  **Méthode _restore_state_after_restart() :**
+  ```python
+  async def _restore_state_after_restart(self) -> None:
+      current_state = self.data.current_state
+      now = dt_util.now()
+      
+      _LOGGER.info("%s Restauration après redémarrage - État: %s", 
+                   self._log_prefix(), current_state)
+      
+      # Logique spécifique par état...
+  ```
+
+  **Appel dans async_setup() :**
+  ```python
+  async def async_setup(self) -> None:
+      # ... code existant ...
+      
+      # Restaurer les triggers et tâches périodiques selon l'état de la machine
+      await self._restore_state_after_restart()
+  ```
+
+  **Gestion des triggers dépassés :**
+  - Si recovery_update_hour est dans le passé → recalcul immédiat
+  - Si recovery_start_hour est dans le passé → démarrage immédiat de la relance
+  - Si target_hour est dans le passé en mode HEATING_PROCESS → fin de relance immédiate
+
+test_scenarios:
+  - scenario: "Redémarrage pendant MONITORING avant recovery_start_hour"
+    expected: "Triggers recovery_update_hour et recovery_start_hour reprogrammés"
+  - scenario: "Redémarrage pendant MONITORING après recovery_start_hour"
+    expected: "on_recovery_start() appelé immédiatement"
+  - scenario: "Redémarrage pendant RECOVERY"
+    expected: "Transition automatique vers HEATING_PROCESS"
+  - scenario: "Redémarrage pendant HEATING_PROCESS avant target_hour"
+    expected: "Surveillance TSP continue normalement"
+  - scenario: "Redémarrage pendant HEATING_PROCESS après target_hour"
+    expected: "on_recovery_end() appelé immédiatement"
+  - scenario: "Redémarrage avec état corrompu"
+    expected: "Warning logué et réinitialisation à HEATING_ON"
+
+examples: |
+  **Logs lors d'une restauration en état MONITORING :**
+  ```
+  [Salon#a1b2c3d4] Restauration après redémarrage - État: monitoring
+  [Salon#a1b2c3d4] Trigger recovery_update_hour reprogrammé: 2026-02-03 02:30:00
+  [Salon#a1b2c3d4] Trigger recovery_start reprogrammé: 2026-02-03 04:15:00
+  ```
+
+  **Logs lors d'une restauration avec trigger dépassé :**
+  ```
+  [Chambre#e5f6g7h8] Restauration après redémarrage - État: monitoring
+  [Chambre#e5f6g7h8] Trigger recovery_update_hour dépassé, recalcul immédiat
+  [Chambre#e5f6g7h8] Recovery time: 2026-02-03 04:45:00 (1.50h avant target)
+  [Chambre#e5f6g7h8] Prochaine mise à jour programmée: 2026-02-03 03:30:00
+  ```
+
+  **Logs lors d'une restauration en état RECOVERY (rare) :**
+  ```
+  [Bureau#f7g8h9i0] Restauration après redémarrage - État: recovery
+  [Bureau#f7g8h9i0] État RECOVERY restauré pendant redémarrage - Passage à HEATING_PROCESS
+  [Bureau#f7g8h9i0] Données apprises et état sauvegardés en stockage
+  [Bureau#f7g8h9i0] État HEATING_PROCESS restauré - Surveillance TSP active (rp_calc_mode=True)
+  ```
