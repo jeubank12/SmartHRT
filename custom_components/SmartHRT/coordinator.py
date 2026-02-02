@@ -700,7 +700,11 @@ class SmartHRTCoordinator:
             self._unsub_recovery_update()
             self._unsub_recovery_update = None
 
-        _LOGGER.debug("SmartHRT: Programmation prochaine mise à jour: %s", trigger_time)
+        _LOGGER.debug(
+            "%s Programmation prochaine mise à jour: %s",
+            self._log_prefix(),
+            trigger_time,
+        )
         self._unsub_recovery_update = async_track_point_in_time(
             self._hass, self._on_recovery_update_hour, trigger_time
         )
@@ -716,12 +720,19 @@ class SmartHRTCoordinator:
         au lieu de scanner automatiquement toutes les entités weather.
         """
         if not self._weather_entity_id:
-            _LOGGER.debug("No weather entity configured, skipping weather update")
+            _LOGGER.debug(
+                "%s Aucune entité météo configurée, mise à jour météo ignorée",
+                self._log_prefix(),
+            )
             return
 
         weather = self._hass.states.get(self._weather_entity_id)
         if weather is None:
-            _LOGGER.warning("Weather entity %s not found", self._weather_entity_id)
+            _LOGGER.warning(
+                "%s Entité météo %s non trouvée",
+                self._log_prefix(),
+                self._weather_entity_id,
+            )
             return
 
         if (temp := weather.attributes.get("temperature")) is not None:
@@ -799,13 +810,16 @@ class SmartHRTCoordinator:
                                 )
 
                             _LOGGER.debug(
-                                "Prévisions mises à jour: temp=%.1f°C, vent=%.1fkm/h",
+                                "%s Prévisions mises à jour: temp=%.1f°C, vent=%.1fkm/h",
+                                self._log_prefix(),
                                 self.data.temperature_forecast_avg,
                                 self.data.wind_speed_forecast_avg,
                             )
         except Exception as ex:
             _LOGGER.warning(
-                "Erreur lors de la récupération des prévisions météo: %s", ex
+                "%s Erreur lors de la récupération des prévisions météo: %s",
+                self._log_prefix(),
+                ex,
             )
 
     def _calculate_windchill(self) -> None:
@@ -926,7 +940,8 @@ class SmartHRTCoordinator:
         # car async_track_point_in_time doit être appelé depuis le thread principal
 
         _LOGGER.debug(
-            "Recovery time: %s (%.2fh avant target)",
+            "%s Recovery time: %s (%.2fh avant target)",
+            self._log_prefix(),
             self.data.recovery_start_hour,
             duree_relance,
         )
@@ -971,7 +986,8 @@ class SmartHRTCoordinator:
         update_time = now + timedelta(seconds=seconds)
 
         _LOGGER.debug(
-            "Recovery update time calculated: %s (time_remaining=%.0fs, seconds=%.0fs)",
+            "%s Recovery update time calculated: %s (time_remaining=%.0fs, seconds=%.0fs)",
+            self._log_prefix(),
             update_time,
             time_remaining,
             seconds,
