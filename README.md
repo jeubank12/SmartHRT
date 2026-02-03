@@ -74,6 +74,32 @@ Required parameters are configured via the Home Assistant interface:
 
 SmartHRT automatically creates **Sensors**, **Numbers**, **Switches** and **Time** entities. See [User Guide](docs/GUIDE.md#available-sensors--controls) for complete list and descriptions.
 
+---
+
+## 🔧 Services
+
+SmartHRT provides Home Assistant services to control the heating cycle manually if needed.
+
+→ **[Complete services documentation](docs/SERVICES.md)**
+
+**Recommended services**:
+
+- `start_heating_cycle` - Start a new heating cycle
+- `stop_heating` - Stop heating and start monitoring
+- `start_recovery` - Start heating recovery phase
+- `end_recovery` - End recovery phase
+- `get_state` - Get current state and details
+- `reset_learning` - Reset learned thermal coefficients
+- `trigger_calculation` - Force immediate recalculation
+
+**Example**:
+
+```yaml
+service: smarthrt.stop_heating
+```
+
+See [Services Migration Guide](docs/SERVICES_MIGRATION.md) if upgrading from older versions.
+
 ## Requirements
 
 - For dashboard interface:
@@ -114,5 +140,3 @@ Common questions covered:
 ## 📄 License
 
 This project is licensed under the GNU GENERAL PUBLIC LICENSE. See the [LICENCE](LICENCE) file for details.
-
-

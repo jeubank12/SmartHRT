@@ -50,15 +50,24 @@ DEVICE_MANUFACTURER = "SmartHRT"
 # Data keys for hass.data[DOMAIN][entry_id]
 DATA_COORDINATOR = "coordinator"
 
-# Service names
+# Service names - Nouveaux services simplifiés
+SERVICE_START_HEATING_CYCLE = "start_heating_cycle"
+SERVICE_STOP_HEATING = "stop_heating"
+SERVICE_START_RECOVERY = "start_recovery"
+SERVICE_END_RECOVERY = "end_recovery"
+SERVICE_GET_STATE = "get_state"
+
+# Service names - Services utilitaires
+SERVICE_RESET_LEARNING = "reset_learning"
+SERVICE_TRIGGER_CALCULATION = "trigger_calculation"
+
+# Service names - Services historiques (conservés pour compatibilité)
 SERVICE_CALCULATE_RECOVERY_TIME = "calculate_recovery_time"
 SERVICE_CALCULATE_RECOVERY_UPDATE_TIME = "calculate_recovery_update_time"
 SERVICE_CALCULATE_RCTH_FAST = "calculate_rcth_fast"
 SERVICE_ON_HEATING_STOP = "on_heating_stop"
 SERVICE_ON_RECOVERY_START = "on_recovery_start"
 SERVICE_ON_RECOVERY_END = "on_recovery_end"
-SERVICE_RESET_LEARNING = "reset_learning"
-SERVICE_TRIGGER_CALCULATION = "trigger_calculation"
 
 # Weather forecast settings
 FORECAST_HOURS = 3
@@ -95,6 +104,9 @@ PERSISTED_FIELDS: list[tuple[str, str, object, str]] = [
     ("stop_lag_duration", "stop_lag_duration", 0.0, "float"),
     # Historique vent (ADR-013: moyenne 4h pour calcul coefficients)
     ("wind_speed_history", "wind_speed_history", [], "list"),
+    # Prévisions météo (ADR-002: persistées pour continuité au redémarrage)
+    ("temperature_forecast_avg", "temperature_forecast_avg", 0.0, "float"),
+    ("wind_speed_forecast_avg", "wind_speed_forecast_avg", 0.0, "float"),
     # Données de session
     ("recovery_start_hour", "recovery_start_hour", None, "datetime"),
     ("time_recovery_calc", "time_recovery_calc", None, "datetime"),

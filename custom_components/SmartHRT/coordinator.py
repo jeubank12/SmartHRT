@@ -15,6 +15,7 @@ ADR implémentées dans ce module:
 
 import logging
 import math
+import asyncio
 from datetime import datetime, timedelta, time as dt_time
 from dataclasses import dataclass, field
 from typing import Callable
@@ -210,6 +211,10 @@ class SmartHRTCoordinator:
             self.data.recoverycalc_hour,
         )
 
+        # Attendre que l'entité météo soit disponible avant de continuer
+        if self._weather_entity_id:
+            await self._wait_for_weather_entity()
+
         # Restore learned coefficients from storage
         await self._restore_learned_data()
 
@@ -297,12 +302,14 @@ class SmartHRTCoordinator:
                     setattr(self.data, attr_name, stored_value)
 
             _LOGGER.debug(
-                "%s Données restaurées: state=%s, rcth=%.2f, rpth=%.2f, recovery_calc_mode=%s",
+                "%s Données restaurées: state=%s, rcth=%.2f, rpth=%.2f, recovery_calc_mode=%s, temp_forecast=%.1f°C, wind_forecast=%.1f",
                 self._log_prefix(),
                 self.data.current_state,
                 self.data.rcth,
                 self.data.rpth,
                 self.data.recovery_calc_mode,
+                self.data.temperature_forecast_avg,
+                self.data.wind_speed_forecast_avg,
             )
         else:
             _LOGGER.debug(
@@ -1083,6 +1090,45 @@ class SmartHRTCoordinator:
     # ─────────────────────────────────────────────────────────────────────────
     # Données météo
     # ─────────────────────────────────────────────────────────────────────────
+
+    async def _wait_for_weather_entity(self) -> None:
+        """Attend que l'entité météo soit disponible avant de continuer l'initialisation.
+
+        Cette méthode attend jusqu'à 30 secondes que l'entité météo soit chargée
+        par Home Assistant avant de continuer avec l'initialisation de SmartHRT.
+        Cela évite les erreurs "Entité météo non trouvée" au démarrage.
+        """
+        max_wait_seconds = 30
+        check_interval = 0.5
+        elapsed = 0.0
+
+        _LOGGER.debug(
+            "%s Attente de la disponibilité de l'entité météo %s...",
+            self._log_prefix(),
+            self._weather_entity_id,
+        )
+
+        while elapsed < max_wait_seconds:
+            weather = self._hass.states.get(self._weather_entity_id)
+            if weather is not None:
+                _LOGGER.info(
+                    "%s Entité météo %s disponible après %.1fs",
+                    self._log_prefix(),
+                    self._weather_entity_id,
+                    elapsed,
+                )
+                return
+
+            await self._hass.async_block_till_done()
+            await asyncio.sleep(check_interval)
+            elapsed += check_interval
+
+        _LOGGER.warning(
+            "%s Entité météo %s toujours non disponible après %ds - poursuite de l'initialisation",
+            self._log_prefix(),
+            self._weather_entity_id,
+            max_wait_seconds,
+        )
 
     def _update_weather_data(self) -> None:
         """Mise à jour des données météo actuelles.

@@ -25,6 +25,13 @@ from .const import (
     SERVICE_TRIGGER_CALCULATION,
 )
 
+# Nouveaux services simplifiés
+SERVICE_START_HEATING_CYCLE = "start_heating_cycle"
+SERVICE_STOP_HEATING = "stop_heating"
+SERVICE_START_RECOVERY = "start_recovery"
+SERVICE_END_RECOVERY = "end_recovery"
+SERVICE_GET_STATE = "get_state"
+
 _LOGGER = logging.getLogger(__name__)
 
 # Clé pour stocker le flag d'enregistrement des services
@@ -32,14 +39,22 @@ DATA_SERVICES_REGISTERED = "services_registered"
 
 # Liste des services disponibles
 SERVICES = [
+    # Services simplifiés (recommandés)
+    SERVICE_START_HEATING_CYCLE,
+    SERVICE_STOP_HEATING,
+    SERVICE_START_RECOVERY,
+    SERVICE_END_RECOVERY,
+    SERVICE_GET_STATE,
+    # Services utilitaires
+    SERVICE_RESET_LEARNING,
+    SERVICE_TRIGGER_CALCULATION,
+    # Services historiques (conservés pour compatibilité)
     SERVICE_CALCULATE_RECOVERY_TIME,
     SERVICE_CALCULATE_RECOVERY_UPDATE_TIME,
     SERVICE_CALCULATE_RCTH_FAST,
     SERVICE_ON_HEATING_STOP,
     SERVICE_ON_RECOVERY_START,
     SERVICE_ON_RECOVERY_END,
-    SERVICE_RESET_LEARNING,
-    SERVICE_TRIGGER_CALCULATION,
 ]
 
 
@@ -285,16 +300,171 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "success": True,
         }
 
+    # Nouveaux handlers simplifiés
+    async def handle_start_heating_cycle(call: ServiceCall) -> dict[str, Any]:
+        """Démarre un nouveau cycle de chauffage (HEATING_ON)."""
+        entry_id = call.data.get("entry_id")
+        coord = _get_coordinator(hass, entry_id)
+        if not coord:
+            error_msg = (
+                f"Coordinateur non trouvé pour entry_id={entry_id}"
+                if entry_id
+                else "Aucun coordinateur SmartHRT disponible"
+            )
+            _LOGGER.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        # Forcer l'état à HEATING_ON
+        from .coordinator import SmartHRTState
+
+        coord.data.current_state = SmartHRTState.HEATING_ON
+        coord.data.rp_calc_mode = False
+        coord.data.recovery_calc_mode = False
+        coord.data.temp_lag_detection_active = False
+        coord._notify_listeners()
+        await coord._save_learned_data()
+
+        _LOGGER.info("%s Cycle de chauffage démarré manuellement", coord._log_prefix())
+
+        return {
+            "success": True,
+            "state": coord.data.current_state,
+            "message": "Cycle de chauffage démarré",
+        }
+
+    async def handle_stop_heating(call: ServiceCall) -> dict[str, Any]:
+        """Arrête le chauffage et démarre la surveillance (DETECTING_LAG → MONITORING)."""
+        entry_id = call.data.get("entry_id")
+        coord = _get_coordinator(hass, entry_id)
+        if not coord:
+            error_msg = (
+                f"Coordinateur non trouvé pour entry_id={entry_id}"
+                if entry_id
+                else "Aucun coordinateur SmartHRT disponible"
+            )
+            _LOGGER.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        # Appel à la méthode _on_recoverycalc_hour qui gère la transition proprement
+        await coord._on_recoverycalc_hour(None)
+
+        return {
+            "success": True,
+            "state": coord.data.current_state,
+            "recovery_start_hour": (
+                coord.data.recovery_start_hour.isoformat()
+                if coord.data.recovery_start_hour
+                else None
+            ),
+            "message": "Chauffage arrêté, surveillance démarrée",
+        }
+
+    async def handle_start_recovery(call: ServiceCall) -> dict[str, Any]:
+        """Démarre la relance de chauffage (RECOVERY → HEATING_PROCESS)."""
+        entry_id = call.data.get("entry_id")
+        coord = _get_coordinator(hass, entry_id)
+        if not coord:
+            error_msg = (
+                f"Coordinateur non trouvé pour entry_id={entry_id}"
+                if entry_id
+                else "Aucun coordinateur SmartHRT disponible"
+            )
+            _LOGGER.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        coord.on_recovery_start()
+
+        return {
+            "success": True,
+            "state": coord.data.current_state,
+            "time_recovery_start": (
+                coord.data.time_recovery_start.isoformat()
+                if coord.data.time_recovery_start
+                else None
+            ),
+            "rcth_calculated": coord.data.rcth_calculated,
+            "message": "Relance démarrée",
+        }
+
+    async def handle_end_recovery(call: ServiceCall) -> dict[str, Any]:
+        """Termine la relance de chauffage (HEATING_PROCESS → HEATING_ON)."""
+        entry_id = call.data.get("entry_id")
+        coord = _get_coordinator(hass, entry_id)
+        if not coord:
+            error_msg = (
+                f"Coordinateur non trouvé pour entry_id={entry_id}"
+                if entry_id
+                else "Aucun coordinateur SmartHRT disponible"
+            )
+            _LOGGER.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        coord.on_recovery_end()
+
+        return {
+            "success": True,
+            "state": coord.data.current_state,
+            "time_recovery_end": (
+                coord.data.time_recovery_end.isoformat()
+                if coord.data.time_recovery_end
+                else None
+            ),
+            "rpth_calculated": coord.data.rpth_calculated,
+            "message": "Relance terminée",
+        }
+
+    async def handle_get_state(call: ServiceCall) -> dict[str, Any]:
+        """Retourne l'état actuel de la machine à états avec détails."""
+        entry_id = call.data.get("entry_id")
+        coord = _get_coordinator(hass, entry_id)
+        if not coord:
+            error_msg = (
+                f"Coordinateur non trouvé pour entry_id={entry_id}"
+                if entry_id
+                else "Aucun coordinateur SmartHRT disponible"
+            )
+            _LOGGER.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        return {
+            "success": True,
+            "state": coord.data.current_state,
+            "smartheating_mode": coord.data.smartheating_mode,
+            "recovery_calc_mode": coord.data.recovery_calc_mode,
+            "rp_calc_mode": coord.data.rp_calc_mode,
+            "temp_lag_detection_active": coord.data.temp_lag_detection_active,
+            "interior_temp": coord.data.interior_temp,
+            "exterior_temp": coord.data.exterior_temp,
+            "target_hour": coord.data.target_hour.isoformat(),
+            "recoverycalc_hour": coord.data.recoverycalc_hour.isoformat(),
+            "recovery_start_hour": (
+                coord.data.recovery_start_hour.isoformat()
+                if coord.data.recovery_start_hour
+                else None
+            ),
+            "time_to_recovery_hours": coord.get_time_to_recovery_hours(),
+            "rcth": coord.data.rcth,
+            "rpth": coord.data.rpth,
+        }
+
     # Mapping des services vers leurs handlers
     handlers = {
+        # Services simplifiés (recommandés)
+        SERVICE_START_HEATING_CYCLE: handle_start_heating_cycle,
+        SERVICE_STOP_HEATING: handle_stop_heating,
+        SERVICE_START_RECOVERY: handle_start_recovery,
+        SERVICE_END_RECOVERY: handle_end_recovery,
+        SERVICE_GET_STATE: handle_get_state,
+        # Services utilitaires
+        SERVICE_RESET_LEARNING: handle_reset_learning,
+        SERVICE_TRIGGER_CALCULATION: handle_trigger_calculation,
+        # Services historiques (conservés pour compatibilité)
         SERVICE_CALCULATE_RECOVERY_TIME: handle_calculate_recovery_time,
         SERVICE_CALCULATE_RECOVERY_UPDATE_TIME: handle_calculate_recovery_update_time,
         SERVICE_CALCULATE_RCTH_FAST: handle_calculate_rcth_fast,
         SERVICE_ON_HEATING_STOP: handle_on_heating_stop,
         SERVICE_ON_RECOVERY_START: handle_on_recovery_start,
         SERVICE_ON_RECOVERY_END: handle_on_recovery_end,
-        SERVICE_RESET_LEARNING: handle_reset_learning,
-        SERVICE_TRIGGER_CALCULATION: handle_trigger_calculation,
     }
 
     # Enregistrer les services
