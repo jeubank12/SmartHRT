@@ -1,0 +1,66 @@
+id: 020
+title: "Initialisation météo différée après démarrage de Home Assistant"
+status: "Accepté"
+date: "2026-02-03"
+type: "Technique"
+context: |
+  Lors du démarrage de Home Assistant, les intégrations sont chargées de manière
+  asynchrone. L'entité météo configurée pour SmartHRT peut ne pas être disponible
+  immédiatement lorsque le coordinateur s'initialise.
+
+  Problèmes identifiés :
+  - Si l'entité météo n'existe pas au moment de async_setup(), les appels à
+    `_hass.states.get(weather_entity_id)` retournent None
+  - Les prévisions météo ne peuvent pas être récupérées
+  - Le calcul de l'heure de relance échoue ou utilise des valeurs par défaut
+
+  Symptômes observés :
+  - Logs d'erreur au démarrage : "Entité météo non trouvée"
+  - Calculs de relance imprécis le premier jour après redémarrage
+  - Prévisions de température/vent à 0 jusqu'au prochain cycle horaire
+
+decision: |
+  Implémenter une initialisation différée des fonctionnalités météo en utilisant
+  l'événement `EVENT_HOMEASSISTANT_STARTED`.
+
+  **Logique d'initialisation :**
+
+  1. Dans `async_setup()`, vérifier si l'entité météo est disponible :
+     ```python
+     weather = self._hass.states.get(self._weather_entity_id)
+     if weather is None:
+         # Différer l'initialisation
+         self._hass.bus.async_listen_once(
+             EVENT_HOMEASSISTANT_STARTED, self._on_homeassistant_started
+         )
+     else:
+         # Initialisation immédiate
+         await self._complete_weather_setup()
+     ```
+
+  2. Méthode `_on_homeassistant_started()` :
+     - Callback déclenché une fois que HA a terminé son démarrage
+     - Appelle `_complete_weather_setup()` pour finaliser l'initialisation
+
+  3. Méthode `_complete_weather_setup()` :
+     - Récupère les prévisions météo
+     - Calcule l'heure de relance initiale
+     - Programme les triggers de relance et mise à jour
+
+  **Avantages :**
+  - Évite les erreurs lors du démarrage
+  - Garantit que les données météo sont disponibles avant calcul
+  - Compatible avec les intégrations météo lentes à s'initialiser
+
+consequences:
+  positive:
+    - Démarrage robuste quelle que soit l'ordre de chargement des intégrations
+    - Pas d'erreurs "entité non trouvée" dans les logs
+    - Calculs précis dès le premier cycle après redémarrage
+  negative:
+    - Léger délai avant la première mise à jour des prévisions
+    - Complexité supplémentaire dans le flux d'initialisation
+  implementation:
+    - Méthode `_on_homeassistant_started()` dans coordinator.py
+    - Méthode `_complete_weather_setup()` dans coordinator.py
+    - Import de `EVENT_HOMEASSISTANT_STARTED` depuis homeassistant.const

@@ -1,0 +1,82 @@
+id: 023
+title: "Protection contre les erreurs dans les setters avec reprogrammation de triggers"
+status: "Accepté"
+date: "2026-02-03"
+type: "Architecture"
+context: |
+  Les setters des entités SmartHRT (NumberEntity, TimeEntity) permettent à
+  l'utilisateur de modifier des paramètres comme TSP, target_hour, ou les
+  coefficients thermiques. Après chaque modification, le système doit recalculer
+  l'heure de relance et reprogrammer les triggers.
+
+  **Problème identifié :**
+  Si `_schedule_recovery_start()` échoue (ex: datetime invalide, état incohérent),
+  une exception non gérée peut :
+  1. Interrompre le setter sans sauvegarder la nouvelle valeur
+  2. Laisser le système dans un état incohérent
+  3. Afficher une erreur à l'utilisateur dans l'interface HA
+
+  **Cas problématiques :**
+  - Modification de target_hour à une valeur déjà passée
+  - Modification de TSP pendant l'état RECOVERY (transitoire)
+  - Conditions de course entre trigger et modification utilisateur
+
+decision: |
+  Encapsuler les appels à `_schedule_recovery_start()` dans les setters avec
+  un bloc try/except pour garantir la robustesse.
+
+  **Pattern implémenté :**
+
+  ```python
+  async def async_set_native_value(self, value: float) -> None:
+      """Set TSP value"""
+      self.coordinator.data.tsp = value
+      self.coordinator.calculate_recovery_time()
+
+      # Reprogrammer le trigger de relance si en mode MONITORING
+      if (
+          self.coordinator.data.recovery_start_hour
+          and self.coordinator.data.current_state == SmartHRTState.MONITORING
+      ):
+          try:
+              self.coordinator._schedule_recovery_start(
+                  self.coordinator.data.recovery_start_hour
+              )
+          except Exception as e:
+              _LOGGER.warning(
+                  "%s Erreur reprogrammation trigger: %s",
+                  self.coordinator._log_prefix(),
+                  e,
+              )
+
+      self.coordinator._notify_listeners()
+      await self.coordinator._save_learned_data()
+  ```
+
+  **Principes :**
+  1. La valeur est toujours mise à jour en premier
+  2. Le calcul de l'heure de relance est toujours exécuté
+  3. La reprogrammation du trigger est protégée par try/except
+  4. Les listeners sont toujours notifiés
+  5. La sauvegarde persistante est toujours effectuée
+
+  **Setters concernés :**
+  - `tsp` (consigne de température)
+  - `target_hour` (heure cible)
+  - `recoverycalc_hour` (heure de coupure)
+  - `rcth`, `rpth`, `rcth_lw`, `rcth_hw`, `rpth_lw`, `rpth_hw` (coefficients)
+  - `relaxation_factor` (facteur de lissage)
+
+consequences:
+  positive:
+    - Robustesse garantie: les modifications utilisateur ne crashent jamais
+    - État cohérent: la valeur est toujours sauvegardée même si le trigger échoue
+    - Traçabilité: les erreurs sont loguées avec le préfixe d'instance
+    - UX améliorée: pas d'erreurs affichées à l'utilisateur
+  negative:
+    - Code légèrement plus verbeux avec les try/except
+    - Risque de masquer des bugs si on ne consulte pas les logs
+  implementation:
+    - Pattern appliqué dans number.py et time.py
+    - Logging avec niveau WARNING pour faciliter le diagnostic
+    - Vérification de l'état avant reprogrammation (MONITORING uniquement)

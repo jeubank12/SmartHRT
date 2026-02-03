@@ -1,0 +1,101 @@
+id: 024
+title: "Sérialisation automatique des types dans PERSISTED_FIELDS"
+status: "Accepté"
+date: "2026-02-03"
+type: "Technique"
+context: |
+  SmartHRT persiste de nombreuses données entre les redémarrages : coefficients
+  thermiques, timestamps, état de la machine à états, historique de vent, etc.
+
+  **Problème :**
+  Les types Python natifs ne sont pas tous sérialisables en JSON :
+  - `datetime` → nécessite conversion en ISO string
+  - `time` → nécessite conversion en string "HH:MM:SS"
+  - `deque` → nécessite conversion en liste
+  - `float`, `bool`, `str` → directement sérialisables
+
+  Gérer chaque champ manuellement dans `_save_learned_data()` et
+  `_restore_learned_data()` serait verbeux et source d'erreurs.
+
+decision: |
+  Créer un mapping `PERSISTED_FIELDS` dans `const.py` qui associe chaque champ
+  persisté à son type, permettant une sérialisation/désérialisation automatique.
+
+  **Structure du mapping :**
+
+  ```python
+  PERSISTED_FIELDS = {
+      # Champ: (type, valeur_défaut_optionnelle)
+      "rcth": ("float", None),
+      "rpth": ("float", None),
+      "target_hour": ("time", None),
+      "recoverycalc_hour": ("time", None),
+      "time_recovery_calc": ("datetime", None),
+      "time_recovery_start": ("datetime", None),
+      "time_recovery_end": ("datetime", None),
+      "current_state": ("str", None),
+      "smartheating_mode": ("bool", None),
+      "recovery_calc_mode": ("bool", None),
+      "wind_speed_history": ("list", None),
+      # ... autres champs
+  }
+  ```
+
+  **Sérialisation (save) :**
+  ```python
+  for field_name, (field_type, _) in PERSISTED_FIELDS.items():
+      value = getattr(self.data, field_name, None)
+      if value is None:
+          continue
+      if field_type == "datetime":
+          data[field_name] = value.isoformat()
+      elif field_type == "time":
+          data[field_name] = value.strftime("%H:%M:%S")
+      elif field_type == "list":
+          data[field_name] = list(value)  # deque → list
+      else:
+          data[field_name] = value
+  ```
+
+  **Désérialisation (restore) :**
+  ```python
+  for field_name, (field_type, default) in PERSISTED_FIELDS.items():
+      if field_name not in stored_data:
+          continue
+      value = stored_data[field_name]
+      if field_type == "datetime":
+          setattr(self.data, field_name, datetime.fromisoformat(value))
+      elif field_type == "time":
+          parts = value.split(":")
+          setattr(self.data, field_name, dt_time(int(parts[0]), int(parts[1])))
+      elif field_type == "list":
+          target = getattr(self.data, field_name)
+          target.clear()
+          target.extend(value)  # Réutilise la deque existante
+      else:
+          setattr(self.data, field_name, value)
+  ```
+
+  **Types supportés :**
+  | Type | Sérialisation | Désérialisation |
+  |------|---------------|-----------------|
+  | float | direct | direct |
+  | bool | direct | direct |
+  | str | direct | direct |
+  | datetime | `.isoformat()` | `datetime.fromisoformat()` |
+  | time | `.strftime("%H:%M:%S")` | `dt_time(h, m, s)` |
+  | list | `list(deque)` | `deque.extend(list)` |
+
+consequences:
+  positive:
+    - Ajout d'un nouveau champ persisté = 1 ligne dans PERSISTED_FIELDS
+    - Pas de code de sérialisation dupliqué
+    - Gestion cohérente des types dans tout le projet
+    - Facilite les tests unitaires de persistance
+  negative:
+    - Indirection supplémentaire (moins explicite que du code manuel)
+    - Nécessite de maintenir PERSISTED_FIELDS synchronisé avec SmartHRTData
+  implementation:
+    - Mapping `PERSISTED_FIELDS` dans const.py
+    - Méthodes `_save_learned_data()` et `_restore_learned_data()` dans coordinator.py
+    - Support de 6 types: float, bool, str, datetime, time, list

@@ -11,6 +11,14 @@ ADR implémentées dans ce module:
 - ADR-009: Persistance coefficients (PERSISTED_FIELDS, Store)
 - ADR-013: Historique vent pour calcul (wind_speed_history, wind_speed_avg)
 - ADR-014: Format des dates (dt_util.now(), dt_util.as_local())
+- ADR-018: Identification instance dans les logs (_log_prefix)
+- ADR-019: Restauration état après redémarrage (_restore_state_after_restart)
+- ADR-020: Initialisation météo différée (EVENT_HOMEASSISTANT_STARTED)
+- ADR-021: Triggers dynamiques (_schedule_recovery_start, async_track_point_in_time)
+- ADR-022: Calcul itératif anticipation (20 itérations dans calculate_recovery_time)
+- ADR-023: Protection erreurs setters (try/except dans _schedule_recovery_start)
+- ADR-024: Sérialisation types (PERSISTED_FIELDS avec datetime, time, list)
+- ADR-025: Fréquence dynamique recalcul (calculate_recovery_update_time)
 """
 
 import logging

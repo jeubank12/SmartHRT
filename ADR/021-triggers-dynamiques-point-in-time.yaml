@@ -1,0 +1,75 @@
+id: 021
+title: "Triggers dynamiques avec async_track_point_in_time"
+status: "Accepté"
+date: "2026-02-03"
+type: "Technique"
+context: |
+  Le système SmartHRT doit déclencher des actions à des heures précises qui changent
+  dynamiquement en fonction des calculs thermiques :
+  - `recovery_start_hour` : heure de démarrage de la relance (calculée)
+  - `recovery_update_hour` : prochaine mise à jour du calcul
+
+  Dans le YAML original, ces déclencheurs étaient gérés par des `input_datetime`
+  et des automations `trigger: time at: input_datetime.xxx`.
+
+  Problèmes avec une approche naïve :
+  - `async_track_time_interval` ne permet pas de programmer à une heure précise
+  - Programmer un nouveau trigger sans annuler l'ancien cause des exécutions multiples
+  - Le "bug yoyo" : plusieurs triggers actifs pour des heures différentes
+
+decision: |
+  Utiliser `async_track_point_in_time` avec gestion explicite des unsubscribe pour
+  programmer des triggers à des heures précises et dynamiques.
+
+  **Pattern implémenté :**
+
+  ```python
+  # Attributs pour stocker les unsubscribe callbacks
+  self._unsub_recovery_start: Callable | None = None
+  self._unsub_recovery_update: Callable | None = None
+
+  @callback
+  def _schedule_recovery_start(self, trigger_time: datetime) -> None:
+      # Annuler le trigger précédent s'il existe
+      if self._unsub_recovery_start:
+          self._unsub_recovery_start()
+
+      self._unsub_recovery_start = async_track_point_in_time(
+          self._hass, self._on_recovery_start_hour, trigger_time
+      )
+
+  @callback
+  def _schedule_recovery_update(self, trigger_time: datetime) -> None:
+      if self._unsub_recovery_update:
+          self._unsub_recovery_update()
+          self._unsub_recovery_update = None
+
+      self._unsub_recovery_update = async_track_point_in_time(
+          self._hass, self._on_recovery_update_hour, trigger_time
+      )
+  ```
+
+  **Points clés :**
+  1. Toujours annuler le trigger précédent avant d'en programmer un nouveau
+  2. Utiliser le décorateur `@callback` pour les méthodes de scheduling
+  3. Nettoyer les unsubscribe dans `async_unload()` pour éviter les fuites mémoire
+  4. Logger les reprogrammations pour faciliter le débogage
+
+  **Triggers statiques (recoverycalc_hour, target_hour) :**
+  Gérés différemment car ils sont récurrents quotidiens :
+  - Programmés initialement dans `_setup_time_triggers()`
+  - Reprogrammés après chaque exécution via `_reschedule_*_hour()`
+
+consequences:
+  positive:
+    - Déclenchements précis à l'heure calculée
+    - Pas de triggers fantômes ou d'exécutions multiples
+    - Compatible avec les changements dynamiques d'heure de relance
+    - Facilite le débogage grâce aux logs de reprogrammation
+  negative:
+    - Nécessite une gestion explicite des unsubscribe
+    - Complexité supplémentaire par rapport aux automations YAML
+  implementation:
+    - Méthodes `_schedule_recovery_start()` et `_schedule_recovery_update()`
+    - Attributs `_unsub_recovery_start` et `_unsub_recovery_update`
+    - Nettoyage dans `async_unload()`

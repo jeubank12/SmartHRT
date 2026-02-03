@@ -1,0 +1,87 @@
+id: 025
+title: "Fréquence dynamique de recalcul de l'heure de relance"
+status: "Accepté"
+date: "2026-02-03"
+type: "Fonctionnel"
+context: |
+  L'heure de relance (recovery_start_hour) doit être recalculée régulièrement
+  pendant la nuit car les conditions changent :
+  - La température intérieure continue de baisser
+  - Les prévisions météo sont mises à jour
+  - Le vent peut changer
+
+  **Approche naïve :**
+  Recalculer toutes les X minutes (ex: toutes les 20 minutes).
+  Problèmes :
+  - Trop fréquent loin de l'heure de relance → consommation CPU inutile
+  - Pas assez fréquent proche de l'heure → imprécision
+
+  **Approche du YAML original :**
+  Script `calculate_recoveryupdate_time` qui adapte la fréquence.
+
+decision: |
+  Implémenter une fréquence de recalcul dynamique basée sur le temps restant
+  avant la relance, fidèle au script YAML `calculate_recoveryupdate_time`.
+
+  **Formule :**
+  ```
+  seconds_until_update = min(max(time_remaining / 3, 0), 1200)
+  ```
+
+  Où `time_remaining` = secondes restantes avant recovery_start_hour.
+
+  **Comportement :**
+  | Temps restant | Prochain recalcul | Ratio |
+  |---------------|-------------------|-------|
+  | 6h (21600s) | 20 min (1200s) | ~5.5% |
+  | 3h (10800s) | 20 min (1200s) | ~11% |
+  | 1h (3600s) | 20 min (1200s) | ~33% |
+  | 30 min (1800s) | 10 min (600s) | ~33% |
+  | 15 min (900s) | 5 min (300s) | ~33% |
+  | 5 min (300s) | 1.6 min (100s) | ~33% |
+
+  **Cas spécial : moins de 30 minutes avant relance :**
+  ```python
+  if time_remaining < 1800:  # 30 minutes
+      seconds = 3600  # Programmer après la relance
+  ```
+
+  Logique : à moins de 30 minutes, on arrête de recalculer car :
+  1. L'heure est quasi-définitive
+  2. Évite les modifications de dernière minute
+  3. Le trigger de relance va bientôt s'exécuter
+
+  **Implémentation :**
+  ```python
+  def calculate_recovery_update_time(self) -> datetime | None:
+      now = dt_util.now()
+      recoverystart_time = now.replace(
+          hour=self.data.recovery_start_hour.hour,
+          minute=self.data.recovery_start_hour.minute,
+      )
+      if recoverystart_time < now:
+          recoverystart_time += timedelta(days=1)
+
+      time_remaining = (recoverystart_time - now).total_seconds()
+
+      if time_remaining < 1800:
+          seconds = 3600
+      else:
+          seconds = min(max(time_remaining / 3, 0), 1200)
+
+      return now + timedelta(seconds=seconds)
+  ```
+
+consequences:
+  positive:
+    - Fréquence adaptée au besoin: plus précis quand c'est important
+    - Économie CPU: moins de calculs loin de l'heure de relance
+    - Fidèle au comportement YAML original
+    - Stabilité: pas de modifications frénétiques en fin de nuit
+  negative:
+    - Logique moins intuitive qu'une fréquence fixe
+    - Nécessite un trigger dynamique (ADR-021)
+  implementation:
+    - Méthode `calculate_recovery_update_time()` dans coordinator.py
+    - Appelée par `_on_recovery_update_hour()` pour chaîner les mises à jour
+    - Trigger via `_schedule_recovery_update()`

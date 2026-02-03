@@ -1,0 +1,77 @@
+id: 022
+title: "Calcul itératif pour l'anticipation thermique"
+status: "Accepté"
+date: "2026-02-03"
+type: "Fonctionnel"
+context: |
+  Le calcul de l'heure de démarrage de la relance doit prédire à quelle heure
+  démarrer le chauffage pour atteindre la température de consigne (TSP) à l'heure
+  cible (target_hour).
+
+  **Le problème :**
+  La formule thermique de base suppose que la température intérieure au moment
+  du démarrage de la relance est connue :
+
+  $$
+  t_{relance} = RC_{th} \cdot \ln\left(\frac{RP_{th} + T_{ext} - T_{int\_start}}{RP_{th} + T_{ext} - T_{sp}}\right)
+  $$
+
+  Or, au moment du calcul, on ne connaît pas encore $T_{int\_start}$ car la
+  température continue de baisser entre maintenant et l'heure de relance.
+
+  **Sans itération :**
+  - On utilise la température actuelle comme approximation
+  - Erreur systématique : la relance démarre trop tard car on surestime Tint_start
+
+decision: |
+  Implémenter un algorithme itératif de 20 passes pour affiner la prédiction,
+  exactement comme dans le script YAML original.
+
+  **Algorithme :**
+
+  1. Calcul initial de la durée de relance avec Tint actuelle
+  2. Pour chaque itération (20 fois) :
+     a. Prédire Tint_start en utilisant la loi de refroidissement :
+        $$T_{int\_start} = T_{ext} + \frac{T_{int} - T_{ext}}{e^{(t_{remaining} - t_{relance})/RC_{th}}}$$
+     b. Recalculer la durée de relance avec cette Tint_start prédite
+     c. Appliquer une moyenne pondérée : `(durée_prev + 2 * durée_new) / 3`
+
+  **Implémentation Python :**
+  ```python
+  for _ in range(20):
+      try:
+          tint_start = text + (tint - text) / math.exp(
+              (time_remaining - duree_relance) / rcth
+          )
+          ratio = (rpth + text - tint_start) / (rpth + text - tsp)
+          if ratio > 0.1:
+              duree_relance = min(
+                  (duree_relance + 2 * max(rcth * math.log(ratio), 0)) / 3,
+                  max_duration,
+              )
+      except (ValueError, ZeroDivisionError):
+          break
+  ```
+
+  **Moyenne pondérée (1:2) :**
+  - Permet une convergence progressive sans oscillations
+  - L'ancien calcul compte pour 1/3, le nouveau pour 2/3
+  - Stabilisation typique en 5-10 itérations
+
+  **Garde-fous :**
+  - `ratio > 0.1` : évite les logarithmes négatifs ou très petits
+  - `max_duration` : ne pas dépasser le temps restant - 10 minutes
+  - Try/except : gestion des divisions par zéro et erreurs mathématiques
+
+consequences:
+  positive:
+    - Prédiction précise même avec des variations de température importantes
+    - Convergence garantie grâce à la moyenne pondérée
+    - Robuste aux cas limites (températures négatives, ratios extrêmes)
+  negative:
+    - 20 itérations = coût CPU légèrement plus élevé
+    - Complexité algorithmique moins intuitive
+  implementation:
+    - Méthode `calculate_recovery_time()` dans coordinator.py
+    - Boucle for avec 20 itérations
+    - Fidèle au script YAML `calculate_recovery_time`
