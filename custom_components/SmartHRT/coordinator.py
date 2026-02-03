@@ -1092,6 +1092,7 @@ class SmartHRTCoordinator:
         les états RECOVERY et HEATING_PROCESS toutes les minutes.
         """
         # Annuler le trigger précédent s'il existe
+        was_rescheduled = self._unsub_recovery_start is not None
         if self._unsub_recovery_start:
             self._unsub_recovery_start()
             self._unsub_recovery_start = None
@@ -1101,8 +1102,9 @@ class SmartHRTCoordinator:
             self._hass, self._on_recovery_start_hour, trigger_time
         )
         _LOGGER.debug(
-            "%s Nouveau trigger de relance planifié: %s",
+            "%s %s trigger de relance planifié: %s",
             self._log_prefix(),
+            "Nouveau" if not was_rescheduled else "Trigger reprogrammé -",
             trigger_time,
         )
 
@@ -1660,6 +1662,12 @@ class SmartHRTCoordinator:
         self.data.text_recovery_calc = self.data.exterior_temp or 0.0
         self.data.temp_lag_detection_active = True
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     def on_recovery_start(self) -> None:
@@ -1749,6 +1757,12 @@ class SmartHRTCoordinator:
     def set_tsp(self, value: float) -> None:
         self.data.tsp = value
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     def set_target_hour(self, value: dt_time) -> None:
@@ -1781,11 +1795,23 @@ class SmartHRTCoordinator:
     def set_rcth(self, value: float) -> None:
         self.data.rcth = value
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     def set_rpth(self, value: float) -> None:
         self.data.rpth = value
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     def set_relaxation_factor(self, value: float) -> None:
@@ -1795,21 +1821,45 @@ class SmartHRTCoordinator:
     def set_rcth_lw(self, value: float) -> None:
         self.data.rcth_lw = value
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     def set_rcth_hw(self, value: float) -> None:
         self.data.rcth_hw = value
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     def set_rpth_lw(self, value: float) -> None:
         self.data.rpth_lw = value
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     def set_rpth_hw(self, value: float) -> None:
         self.data.rpth_hw = value
         self.calculate_recovery_time()
+        # Reprogrammer le trigger de relance avec la nouvelle heure calculée
+        if (
+            self.data.recovery_start_hour
+            and self.data.current_state == SmartHRTState.MONITORING
+        ):
+            self._schedule_recovery_start(self.data.recovery_start_hour)
         self._notify_listeners()
 
     # ─────────────────────────────────────────────────────────────────────────
