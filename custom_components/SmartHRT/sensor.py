@@ -3,6 +3,7 @@
 ADR implémentées dans ce module:
 - ADR-012: Exposition entités pour Lovelace (sensors comme entités HA)
 - ADR-014: Format des dates en fuseau local (dt_util.as_local())
+- ADR-027: Utilisation de CoordinatorEntity pour synchronisation automatique
 """
 
 import logging
@@ -20,6 +21,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.helpers.device_registry import DeviceInfo, DeviceEntryType
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -72,8 +74,14 @@ async def async_setup_entry(
     async_add_entities(entities, True)
 
 
-class SmartHRTBaseSensor(SensorEntity):
-    """Classe de base pour les sensors SmartHRT"""
+class SmartHRTBaseSensor(CoordinatorEntity[SmartHRTCoordinator], SensorEntity):
+    """Classe de base pour les sensors SmartHRT (ADR-027: CoordinatorEntity).
+
+    Hérite de CoordinatorEntity pour bénéficier de:
+    - Synchronisation automatique avec le coordinateur
+    - Gestion automatique des listeners (plus besoin de register/unregister)
+    - Mise à jour automatique de l'état quand coordinator.data change
+    """
 
     _attr_name: str | None = None
     _attr_icon: str | None = None
@@ -85,7 +93,7 @@ class SmartHRTBaseSensor(SensorEntity):
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         """Initialisation de base"""
-        self._coordinator = coordinator
+        super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
         self._device_name = config_entry.data.get(CONF_NAME, "SmartHRT")
@@ -101,26 +109,6 @@ class SmartHRTBaseSensor(SensorEntity):
             manufacturer=DEVICE_MANUFACTURER,
             model="Smart Heating Regulator",
         )
-
-    @property
-    def should_poll(self) -> bool:
-        """Pas de polling pour ces entités"""
-        return False
-
-    async def async_added_to_hass(self) -> None:
-        """Callback appelé lorsque l'entité est ajoutée à HA"""
-        await super().async_added_to_hass()
-        self._coordinator.register_listener(self._on_coordinator_update)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Callback appelé lorsque l'entité est retirée de HA"""
-        self._coordinator.unregister_listener(self._on_coordinator_update)
-        await super().async_will_remove_from_hass()
-
-    @callback
-    def _on_coordinator_update(self) -> None:
-        """Callback lors d'une mise à jour du coordinateur"""
-        self.async_write_ha_state()
 
 
 class SmartHRTTemperatureSensor(SmartHRTBaseSensor):
@@ -386,7 +374,7 @@ class SmartHRTNightStateSensor(SmartHRTBaseSensor):
     @property
     def native_value(self) -> int:
         # Vérifier l'état du soleil
-        sun_state = self._coordinator._hass.states.get("sun.sun")
+        sun_state = self.coordinator.hass.states.get("sun.sun")
         if sun_state and sun_state.state == "below_horizon":
             return 1
         return 0

@@ -1,6 +1,6 @@
 id: 027
 title: "Héritage de DataUpdateCoordinator standard HA"
-status: "Proposé"
+status: "Accepté"
 date: "2026-02-03"
 context: |
   Le fichier `coordinator.py` réimplémente manuellement plusieurs mécanismes

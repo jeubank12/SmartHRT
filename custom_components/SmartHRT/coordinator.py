@@ -19,6 +19,7 @@ ADR implémentées dans ce module:
 - ADR-023: Protection erreurs setters (try/except dans _schedule_recovery_start)
 - ADR-024: Sérialisation types (PERSISTED_FIELDS avec datetime, time, list)
 - ADR-025: Fréquence dynamique recalcul (calculate_recovery_update_time)
+- ADR-027: Héritage DataUpdateCoordinator (notifications automatiques, CoordinatorEntity)
 - ADR-028: Modernisation StrEnum pour machine à états (SmartHRTState, VALID_TRANSITIONS)
 """
 
@@ -38,6 +39,7 @@ from homeassistant.helpers.event import (
     async_track_point_in_time,
 )
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
@@ -174,15 +176,29 @@ class SmartHRTData:
     last_rpth_error: float = 0.0
 
 
-class SmartHRTCoordinator:
-    """Coordinateur central pour SmartHRT"""
+class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
+    """Coordinateur central pour SmartHRT (ADR-027: hérite de DataUpdateCoordinator).
+
+    Hérite de DataUpdateCoordinator pour bénéficier de:
+    - Gestion automatique des listeners via CoordinatorEntity
+    - Debouncing des mises à jour
+    - Gestion d'erreurs standardisée
+    - Logging intégré
+    """
 
     STORAGE_VERSION = 1
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        self._hass = hass
+        # Initialiser DataUpdateCoordinator avec update_interval=None
+        # car les mises à jour sont pilotées par les triggers et événements
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"SmartHRT {entry.data.get(CONF_NAME, 'SmartHRT')}",
+            update_interval=None,  # Pas de polling automatique, mises à jour manuelles
+        )
+
         self._entry = entry
-        self._listeners: list[Callable[[], None]] = []
         self._unsub_listeners: list = []
         self._unsub_time_triggers: list = []
         self._unsub_recovery_update: Callable | None = (
@@ -270,6 +286,14 @@ class SmartHRTCoordinator:
             new_state.value,
         )
 
+    async def _async_update_data(self) -> SmartHRTData:
+        """Méthode requise par DataUpdateCoordinator.
+
+        Retourne les données actuelles car les mises à jour sont pilotées
+        par les événements et triggers, pas par le polling.
+        """
+        return self.data
+
     @staticmethod
     def _parse_time(time_str: str) -> dt_time:
         """Parse une chaîne de temps en objet time"""
@@ -303,7 +327,7 @@ class SmartHRTCoordinator:
         # Différer l'initialisation météo après le démarrage complet de HA
         # si l'entité météo n'est pas encore disponible
         if self._weather_entity_id:
-            weather = self._hass.states.get(self._weather_entity_id)
+            weather = self.hass.states.get(self._weather_entity_id)
             if weather is None:
                 _LOGGER.debug(
                     "%s Entité météo %s pas encore disponible, initialisation différée",
@@ -311,7 +335,7 @@ class SmartHRTCoordinator:
                     self._weather_entity_id,
                 )
                 # Différer l'initialisation météo après le démarrage complet
-                self._hass.bus.async_listen_once(
+                self.hass.bus.async_listen_once(
                     EVENT_HOMEASSISTANT_STARTED, self._on_homeassistant_started
                 )
             else:
@@ -342,7 +366,7 @@ class SmartHRTCoordinator:
         await self._update_weather_forecasts()
 
         # Calcul initial de l'heure de relance
-        await self._hass.async_add_executor_job(self.calculate_recovery_time)
+        await self.hass.async_add_executor_job(self.calculate_recovery_time)
 
         # Programmer le trigger de relance si nécessaire
         now = dt_util.now()
@@ -352,7 +376,7 @@ class SmartHRTCoordinator:
         # Programmer la première mise à jour de recovery_update_hour
         # Le trigger est toujours programmé pour maintenir la chaîne de mises à jour active
         if self.data.smartheating_mode and self.data.recovery_start_hour:
-            update_time = await self._hass.async_add_executor_job(
+            update_time = await self.hass.async_add_executor_job(
                 self.calculate_recovery_update_time
             )
             if update_time:
@@ -492,20 +516,20 @@ class SmartHRTCoordinator:
         if sensors:
             self._unsub_listeners.append(
                 async_track_state_change_event(
-                    self._hass, sensors, self._on_sensor_state_change
+                    self.hass, sensors, self._on_sensor_state_change
                 )
             )
 
         self._unsub_listeners.append(
             async_track_time_interval(
-                self._hass, self._periodic_update, timedelta(minutes=1)
+                self.hass, self._periodic_update, timedelta(minutes=1)
             )
         )
 
         # Update weather forecasts every hour
         self._unsub_listeners.append(
             async_track_time_interval(
-                self._hass, self._hourly_forecast_update, timedelta(hours=1)
+                self.hass, self._hourly_forecast_update, timedelta(hours=1)
             )
         )
 
@@ -527,7 +551,7 @@ class SmartHRTCoordinator:
 
         self._unsub_time_triggers.append(
             async_track_point_in_time(
-                self._hass, self._on_recoverycalc_hour, recoverycalc_dt
+                self.hass, self._on_recoverycalc_hour, recoverycalc_dt
             )
         )
 
@@ -542,7 +566,7 @@ class SmartHRTCoordinator:
             target_dt += timedelta(days=1)
 
         self._unsub_time_triggers.append(
-            async_track_point_in_time(self._hass, self._on_target_hour, target_dt)
+            async_track_point_in_time(self.hass, self._on_target_hour, target_dt)
         )
 
         # Trigger pour recovery_start_hour (démarrage relance)
@@ -553,7 +577,7 @@ class SmartHRTCoordinator:
             if recovery_start > now:
                 self._unsub_time_triggers.append(
                     async_track_point_in_time(
-                        self._hass,
+                        self.hass,
                         self._on_recovery_start_hour,
                         recovery_start,
                     )
@@ -567,7 +591,7 @@ class SmartHRTCoordinator:
             if recovery_update > now:
                 self._unsub_time_triggers.append(
                     async_track_point_in_time(
-                        self._hass,
+                        self.hass,
                         self._on_recovery_update_hour,
                         recovery_update,
                     )
@@ -601,7 +625,7 @@ class SmartHRTCoordinator:
     async def _update_initial_states(self) -> None:
         """Récupération des états initiaux"""
         if self._interior_temp_sensor_id:
-            state = self._hass.states.get(self._interior_temp_sensor_id)
+            state = self.hass.states.get(self._interior_temp_sensor_id)
             if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
                     self.data.interior_temp = float(state.state)
@@ -626,7 +650,7 @@ class SmartHRTCoordinator:
             except ValueError:
                 pass
 
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     @callback
     def _periodic_update(self, _now) -> None:
@@ -637,12 +661,12 @@ class SmartHRTCoordinator:
         """
         self._update_weather_data()
         self._update_wind_speed_average()
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     @callback
     def _hourly_forecast_update(self, _now) -> None:
         """Mise à jour des prévisions météo (chaque heure)"""
-        self._hass.async_create_task(self._update_weather_forecasts())
+        self.hass.async_create_task(self._update_weather_forecasts())
 
     # ─────────────────────────────────────────────────────────────────────────
     # Déclencheurs horaires (équivalent des automations YAML)
@@ -660,7 +684,7 @@ class SmartHRTCoordinator:
             return
 
         # Déléguer les calculs lourds à une tâche asynchrone
-        self._hass.async_create_task(self._async_on_recoverycalc_hour())
+        self.hass.async_create_task(self._async_on_recoverycalc_hour())
 
     async def _async_on_recoverycalc_hour(self) -> None:
         """Exécute l'initialisation à l'heure de coupure du chauffage.
@@ -696,7 +720,7 @@ class SmartHRTCoordinator:
         prev_recovery_start = self.data.recovery_start_hour
 
         # Exécuter les calculs lourds dans un exécuteur
-        await self._hass.async_add_executor_job(self.calculate_recovery_time)
+        await self.hass.async_add_executor_job(self.calculate_recovery_time)
 
         # Programmer le trigger de relance si nécessaire (depuis le thread principal)
         now = dt_util.now()
@@ -709,7 +733,7 @@ class SmartHRTCoordinator:
 
         # Toujours programmer la mise à jour de recovery_update_hour
         # pour maintenir la chaîne de mises à jour active
-        update_time = await self._hass.async_add_executor_job(
+        update_time = await self.hass.async_add_executor_job(
             self.calculate_recovery_update_time
         )
         if update_time:
@@ -721,7 +745,7 @@ class SmartHRTCoordinator:
         # Sauvegarder l'état après la transition
         await self._save_learned_data()
 
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     @callback
     def _on_recovery_start_hour(self, _now) -> None:
@@ -769,7 +793,7 @@ class SmartHRTCoordinator:
 
         _LOGGER.debug("%s Mise à jour du calcul de relance", self._log_prefix())
         # Déléguer les calculs lourds à une tâche asynchrone
-        self._hass.async_create_task(self._async_on_recovery_update_hour())
+        self.hass.async_create_task(self._async_on_recovery_update_hour())
 
     async def _async_on_recovery_update_hour(self) -> None:
         """Exécute les calculs lourds de mise à jour dans un exécuteur"""
@@ -778,8 +802,8 @@ class SmartHRTCoordinator:
 
         # N'exécuter les calculs que si recovery_calc_mode est actif
         if self.data.recovery_calc_mode:
-            await self._hass.async_add_executor_job(self.calculate_rcth_fast)
-            await self._hass.async_add_executor_job(self.calculate_recovery_time)
+            await self.hass.async_add_executor_job(self.calculate_rcth_fast)
+            await self.hass.async_add_executor_job(self.calculate_recovery_time)
 
             # Programmer le trigger de relance si nécessaire (depuis le thread principal)
             now = dt_util.now()
@@ -792,7 +816,7 @@ class SmartHRTCoordinator:
 
         # Toujours reprogrammer le prochain trigger de mise à jour
         # pour maintenir la chaîne active même si recovery_calc_mode est off
-        update_time = await self._hass.async_add_executor_job(
+        update_time = await self.hass.async_add_executor_job(
             self.calculate_recovery_update_time
         )
 
@@ -805,7 +829,7 @@ class SmartHRTCoordinator:
                 update_time,
             )
 
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def _reschedule_recoverycalc_hour(self) -> None:
         """Reprogramme le déclencheur recoverycalc_hour pour le lendemain"""
@@ -819,7 +843,7 @@ class SmartHRTCoordinator:
 
         self._unsub_time_triggers.append(
             async_track_point_in_time(
-                self._hass, self._on_recoverycalc_hour, next_trigger
+                self.hass, self._on_recoverycalc_hour, next_trigger
             )
         )
 
@@ -834,7 +858,7 @@ class SmartHRTCoordinator:
         ) + timedelta(days=1)
 
         self._unsub_time_triggers.append(
-            async_track_point_in_time(self._hass, self._on_target_hour, next_trigger)
+            async_track_point_in_time(self.hass, self._on_target_hour, next_trigger)
         )
 
     def _schedule_recovery_start(self, trigger_time: datetime) -> None:
@@ -859,7 +883,7 @@ class SmartHRTCoordinator:
             )
 
         self._unsub_recovery_start = async_track_point_in_time(
-            self._hass, self._on_recovery_start_hour, trigger_time
+            self.hass, self._on_recovery_start_hour, trigger_time
         )
 
     @callback
@@ -876,7 +900,7 @@ class SmartHRTCoordinator:
             trigger_time,
         )
         self._unsub_recovery_update = async_track_point_in_time(
-            self._hass, self._on_recovery_update_hour, trigger_time
+            self.hass, self._on_recovery_update_hour, trigger_time
         )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -896,7 +920,7 @@ class SmartHRTCoordinator:
             )
             return
 
-        weather = self._hass.states.get(self._weather_entity_id)
+        weather = self.hass.states.get(self._weather_entity_id)
         if weather is None:
             _LOGGER.warning(
                 "%s Entité météo %s non trouvée",
@@ -938,7 +962,7 @@ class SmartHRTCoordinator:
 
         try:
             # Vérifier que le service existe avant de l'appeler
-            if not self._hass.services.has_service("weather", "get_forecasts"):
+            if not self.hass.services.has_service("weather", "get_forecasts"):
                 _LOGGER.debug(
                     "%s Service weather.get_forecasts pas encore disponible (démarrage en cours)",
                     self._log_prefix(),
@@ -946,7 +970,7 @@ class SmartHRTCoordinator:
                 return
 
             # Appeler le service weather.get_forecasts
-            forecast_response = await self._hass.services.async_call(
+            forecast_response = await self.hass.services.async_call(
                 "weather",
                 "get_forecasts",
                 {"type": "hourly"},
@@ -1403,9 +1427,9 @@ class SmartHRTCoordinator:
         )
 
         # Sauvegarder l'état après la transition
-        self._hass.async_create_task(self._save_learned_data())
+        self.hass.async_create_task(self._save_learned_data())
 
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     # ─────────────────────────────────────────────────────────────────────────
     # ADR-019: Restauration état après redémarrage
@@ -1546,7 +1570,7 @@ class SmartHRTCoordinator:
                 if target_dt < now and self.data.rp_calc_mode:
                     self.on_recovery_end()
 
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     async def _transition_to_expected_state(
         self, expected_state: str, now: datetime
@@ -1619,7 +1643,7 @@ class SmartHRTCoordinator:
 
         # Sauvegarder le nouvel état
         await self._save_learned_data()
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def on_heating_stop(self) -> None:
         """Appelé quand le chauffage s'arrête (service manuel)"""
@@ -1639,7 +1663,7 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def on_recovery_start(self) -> None:
         """Appelé au début de la relance
@@ -1678,9 +1702,9 @@ class SmartHRTCoordinator:
         )
 
         # Sauvegarder l'état après la transition
-        self._hass.async_create_task(self._save_learned_data())
+        self.hass.async_create_task(self._save_learned_data())
 
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def on_recovery_end(self) -> None:
         """Appelé à la fin de la relance (consigne atteinte ou target_hour)
@@ -1713,9 +1737,9 @@ class SmartHRTCoordinator:
         )
 
         # Sauvegarder l'état après la transition (coefficients mis à jour)
-        self._hass.async_create_task(self._save_learned_data())
+        self.hass.async_create_task(self._save_learned_data())
 
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def _on_recovery_end(self) -> None:
         """Ancienne méthode interne - redirige vers on_recovery_end"""
@@ -1739,31 +1763,31 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_target_hour(self, value: dt_time) -> None:
         self.data.target_hour = value
         self._setup_time_triggers()  # Reconfigure les triggers
         self.calculate_recovery_time()
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
         # Persister la nouvelle valeur
-        self._hass.async_create_task(self._save_learned_data())
+        self.hass.async_create_task(self._save_learned_data())
 
     def set_recoverycalc_hour(self, value: dt_time) -> None:
         """Définit l'heure de coupure chauffage"""
         self.data.recoverycalc_hour = value
         self._setup_time_triggers()  # Reconfigure les triggers
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
         # Persister la nouvelle valeur
-        self._hass.async_create_task(self._save_learned_data())
+        self.hass.async_create_task(self._save_learned_data())
 
     def set_smartheating_mode(self, value: bool) -> None:
         self.data.smartheating_mode = value
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_recovery_adaptive_mode(self, value: bool) -> None:
         self.data.recovery_adaptive_mode = value
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_adaptive_mode(self, value: bool) -> None:
         self.set_recovery_adaptive_mode(value)
@@ -1782,7 +1806,7 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_rpth(self, value: float) -> None:
         self.data.rpth = value
@@ -1798,11 +1822,11 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_relaxation_factor(self, value: float) -> None:
         self.data.relaxation_factor = value
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_rcth_lw(self, value: float) -> None:
         self.data.rcth_lw = value
@@ -1818,7 +1842,7 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_rcth_hw(self, value: float) -> None:
         self.data.rcth_hw = value
@@ -1834,7 +1858,7 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_rpth_lw(self, value: float) -> None:
         self.data.rpth_lw = value
@@ -1850,7 +1874,7 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def set_rpth_hw(self, value: float) -> None:
         self.data.rpth_hw = value
@@ -1866,7 +1890,7 @@ class SmartHRTCoordinator:
                 _LOGGER.warning(
                     "%s Erreur reprogrammation trigger: %s", self._log_prefix(), e
                 )
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public methods for services
@@ -1898,7 +1922,7 @@ class SmartHRTCoordinator:
 
         # Recalculate recovery time with new coefficients
         self.calculate_recovery_time()
-        self._notify_listeners()
+        self.async_set_updated_data(self.data)
 
     def get_time_to_recovery_hours(self) -> float | None:
         """Calculate the time remaining until recovery starts in hours.
@@ -1920,18 +1944,3 @@ class SmartHRTCoordinator:
 
         # Return 0 if time has passed
         return max(0, round(hours, 2))
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Listeners
-    # ─────────────────────────────────────────────────────────────────────────
-
-    def register_listener(self, listener: Callable[[], None]) -> None:
-        self._listeners.append(listener)
-
-    def unregister_listener(self, listener: Callable[[], None]) -> None:
-        if listener in self._listeners:
-            self._listeners.remove(listener)
-
-    def _notify_listeners(self) -> None:
-        for listener in self._listeners:
-            listener()
