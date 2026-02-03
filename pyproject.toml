@@ -19,6 +19,9 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
 addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::RuntimeWarning:custom_components.SmartHRT.coordinator",
+]
 
 [dependency-groups]
 dev = [

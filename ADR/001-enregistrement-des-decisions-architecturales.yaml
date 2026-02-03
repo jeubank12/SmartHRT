@@ -7,7 +7,7 @@ context: |
 decision: |
   Nous utiliserons les ADR (Architecture Decision Records) pour documenter les changements architecturaux significatifs.
   - Format : YAML (pour être lisible par machine et humain).
-  - Emplacement : Dossier `doc/adr` à la racine du projet.
+  - Emplacement : Dossier `ADR/` à la racine du projet.
   - Cycle de vie : Proposé -> Accepté / Rejeté -> Obsolète.
 consequences:
   positive:

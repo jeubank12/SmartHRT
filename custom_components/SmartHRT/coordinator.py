@@ -46,7 +46,6 @@ from .const import (
     DEFAULT_RELAXATION_FACTOR,
     WIND_HIGH,
     WIND_LOW,
-    DATA_COORDINATOR,
     FORECAST_HOURS,
     TEMP_DECREASE_THRESHOLD,
     DEFAULT_RECOVERYCALC_HOUR,
@@ -282,6 +281,17 @@ class SmartHRTCoordinator:
                     except (ValueError, TypeError):
                         # Keep current value if parsing fails
                         pass
+                elif field_type == "list":
+                    # Restore list to deque (for wind_speed_history)
+                    if isinstance(stored_value, list):
+                        current_deque = getattr(self.data, attr_name)
+                        if isinstance(current_deque, deque):
+                            current_deque.clear()
+                            current_deque.extend(stored_value)
+                        else:
+                            setattr(
+                                self.data, attr_name, deque(stored_value, maxlen=240)
+                            )
                 else:
                     # Direct assignment for float, bool, str
                     setattr(self.data, attr_name, stored_value)
@@ -320,6 +330,14 @@ class SmartHRTCoordinator:
             elif field_type == "time":
                 # Serialize time to HH:MM:SS string
                 data_to_store[storage_key] = value.isoformat() if value else None
+            elif field_type == "list":
+                # Serialize deque to list (for wind_speed_history)
+                if isinstance(value, deque):
+                    data_to_store[storage_key] = list(value)
+                else:
+                    data_to_store[storage_key] = (
+                        value if isinstance(value, list) else []
+                    )
             else:
                 # Direct storage for float, bool, str
                 data_to_store[storage_key] = value
@@ -873,9 +891,15 @@ class SmartHRTCoordinator:
         self._hass.async_create_task(self._async_on_recoverycalc_hour())
 
     async def _async_on_recoverycalc_hour(self) -> None:
-        """Exécute les calculs lourds de l'heure de coupure dans un exécuteur
+        """Exécute l'initialisation à l'heure de coupure du chauffage.
 
         Transition: HEATING_ON → DETECTING_LAG (État 1 → État 2)
+
+        Conformément au YAML original (automation heatingstopTIME):
+        - On enregistre les valeurs courantes (temps, température)
+        - On active la détection du lag de température
+        - On N'appelle PAS calculate_recovery_time ici (sera fait après
+          détection de la baisse de -0.2°C dans _on_temperature_decrease_detected)
         """
         # Initialisation des constantes si première exécution
         if self.data.rcth_lw <= 0:
@@ -885,39 +909,16 @@ class SmartHRTCoordinator:
             self.data.rpth_hw = 50.0
             _LOGGER.info("%s Initialisation des constantes à 50", self._log_prefix())
 
-        # Enregistre les valeurs courantes
+        # Enregistre les valeurs courantes (snapshot avant refroidissement)
         self.data.time_recovery_calc = dt_util.now()
         self.data.temp_recovery_calc = self.data.interior_temp or 17.0
         self.data.text_recovery_calc = self.data.exterior_temp or 0.0
 
         # Transition vers DETECTING_LAG (État 2)
+        # On attend la baisse de température de 0.2°C avant de lancer les calculs
         self.data.current_state = SmartHRTState.DETECTING_LAG
         self.data.temp_lag_detection_active = True
         _LOGGER.debug("%s Transition vers état DETECTING_LAG", self._log_prefix())
-
-        # Sauvegarder l'heure de relance avant calcul
-        prev_recovery_start = self.data.recovery_start_hour
-
-        # Exécuter les calculs lourds dans un exécuteur
-        await self._hass.async_add_executor_job(self.calculate_recovery_time)
-
-        # Programmer le trigger de relance si nécessaire (depuis le thread principal)
-        now = dt_util.now()
-        if (
-            self.data.recovery_start_hour
-            and prev_recovery_start != self.data.recovery_start_hour
-            and self.data.recovery_start_hour > now
-        ):
-            self._schedule_recovery_start(self.data.recovery_start_hour)
-
-        # Toujours programmer la mise à jour de recovery_update_hour
-        # pour maintenir la chaîne de mises à jour active
-        update_time = await self._hass.async_add_executor_job(
-            self.calculate_recovery_update_time
-        )
-        if update_time:
-            self.data.recovery_update_hour = update_time
-            self._schedule_recovery_update(update_time)
 
         self._reschedule_recoverycalc_hour()
 
@@ -1436,7 +1437,11 @@ class SmartHRTCoordinator:
             self._update_coefficients("rcth")
 
     def calculate_rpth_at_recovery_end(self) -> None:
-        """Calcule RPth à la fin de la relance"""
+        """Calcule RPth à la fin de la relance
+
+        Utilise wind_speed_avg (moyenne 4h) pour l'interpolation RCth,
+        conformément au YAML original (sensor.wind_speed_avg).
+        """
         if self.data.time_recovery_start is None or self.data.time_recovery_end is None:
             return
 
@@ -1445,7 +1450,8 @@ class SmartHRTCoordinator:
             - self.data.time_recovery_start.timestamp()
         ) / 3600
         avg_text = (self.data.text_recovery_start + self.data.text_recovery_end) / 2
-        rcth_interpol = self._get_interpolated_rcth(self.data.wind_speed * 3.6)
+        # Utiliser wind_speed_avg (moyenne 4h) comme dans le YAML
+        rcth_interpol = self._get_interpolated_rcth(self.data.wind_speed_avg * 3.6)
 
         try:
             exp_term = math.exp(dt / rcth_interpol)
@@ -1466,8 +1472,11 @@ class SmartHRTCoordinator:
         - Calcule l'erreur entre valeur mesurée et interpolée
         - Applique une formule de relaxation pour éviter les oscillations
         - Met à jour rcth_lw/hw ou rpth_lw/hw selon le vent actuel
+
+        Utilise wind_speed_avg (moyenne 4h) conformément au YAML original.
         """
-        wind_kmh = self.data.wind_speed * 3.6
+        # Utiliser wind_speed_avg (moyenne 4h) comme dans le YAML
+        wind_kmh = self.data.wind_speed_avg * 3.6
         x = (wind_kmh - WIND_LOW) / (WIND_HIGH - WIND_LOW) - 0.5
         relax = self.data.relaxation_factor
 

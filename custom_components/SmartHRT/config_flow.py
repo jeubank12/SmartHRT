@@ -31,7 +31,6 @@ from .const import (
     DEFAULT_TSP_MIN,
     DEFAULT_TSP_MAX,
     DEFAULT_TSP_STEP,
-    DEFAULT_RECOVERYCALC_HOUR,
 )
 
 _LOGGER = logging.getLogger(__name__)
