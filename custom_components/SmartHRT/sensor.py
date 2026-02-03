@@ -3,6 +3,7 @@
 ADR implémentées dans ce module:
 - ADR-012: Exposition entités pour Lovelace (sensors comme entités HA)
 - ADR-014: Format des dates en fuseau local (dt_util.as_local())
+- ADR-027: Utilisation de CoordinatorEntity pour synchronisation automatique
 """
 
 import logging
@@ -20,6 +21,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.helpers.device_registry import DeviceInfo, DeviceEntryType
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -72,8 +74,14 @@ async def async_setup_entry(
     async_add_entities(entities, True)
 
 
-class SmartHRTBaseSensor(SensorEntity):
-    """Classe de base pour les sensors SmartHRT"""
+class SmartHRTBaseSensor(CoordinatorEntity[SmartHRTCoordinator], SensorEntity):
+    """Classe de base pour les sensors SmartHRT (ADR-027: CoordinatorEntity).
+
+    Hérite de CoordinatorEntity pour bénéficier de:
+    - Synchronisation automatique avec le coordinateur
+    - Gestion automatique des listeners (plus besoin de register/unregister)
+    - Mise à jour automatique de l'état quand coordinator.data change
+    """
 
     _attr_name: str | None = None
     _attr_icon: str | None = None
@@ -85,7 +93,7 @@ class SmartHRTBaseSensor(SensorEntity):
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         """Initialisation de base"""
-        self._coordinator = coordinator
+        super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
         self._device_name = config_entry.data.get(CONF_NAME, "SmartHRT")
@@ -101,26 +109,6 @@ class SmartHRTBaseSensor(SensorEntity):
             manufacturer=DEVICE_MANUFACTURER,
             model="Smart Heating Regulator",
         )
-
-    @property
-    def should_poll(self) -> bool:
-        """Pas de polling pour ces entités"""
-        return False
-
-    async def async_added_to_hass(self) -> None:
-        """Callback appelé lorsque l'entité est ajoutée à HA"""
-        await super().async_added_to_hass()
-        self._coordinator.register_listener(self._on_coordinator_update)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Callback appelé lorsque l'entité est retirée de HA"""
-        self._coordinator.unregister_listener(self._on_coordinator_update)
-        await super().async_will_remove_from_hass()
-
-    @callback
-    def _on_coordinator_update(self) -> None:
-        """Callback lors d'une mise à jour du coordinateur"""
-        self.async_write_ha_state()
 
 
 class SmartHRTTemperatureSensor(SmartHRTBaseSensor):
@@ -159,7 +147,7 @@ class SmartHRTInteriorTempSensor(SmartHRTTemperatureSensor):
 
     @property
     def native_value(self) -> float | None:
-        return self._coordinator.data.interior_temp
+        return self.coordinator.data.interior_temp
 
 
 class SmartHRTExteriorTempSensor(SmartHRTTemperatureSensor):
@@ -176,7 +164,7 @@ class SmartHRTExteriorTempSensor(SmartHRTTemperatureSensor):
 
     @property
     def native_value(self) -> float | None:
-        return self._coordinator.data.exterior_temp
+        return self.coordinator.data.exterior_temp
 
 
 class SmartHRTWindSpeedSensor(SmartHRTWindSensor):
@@ -194,8 +182,8 @@ class SmartHRTWindSpeedSensor(SmartHRTWindSensor):
     @property
     def native_value(self) -> float | None:
         return (
-            round(self._coordinator.data.wind_speed, 1)
-            if self._coordinator.data.wind_speed
+            round(self.coordinator.data.wind_speed, 1)
+            if self.coordinator.data.wind_speed
             else None
         )
 
@@ -214,7 +202,7 @@ class SmartHRTWindchillSensor(SmartHRTTemperatureSensor):
 
     @property
     def native_value(self) -> float | None:
-        return self._coordinator.data.windchill
+        return self.coordinator.data.windchill
 
 
 class SmartHRTRCthSensor(SmartHRTBaseSensor):
@@ -229,7 +217,7 @@ class SmartHRTRCthSensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> float | None:
-        return round(self._coordinator.data.rcth, 2)
+        return round(self.coordinator.data.rcth, 2)
 
     @property
     def icon(self) -> str | None:
@@ -247,10 +235,10 @@ class SmartHRTRCthSensor(SmartHRTBaseSensor):
     def extra_state_attributes(self) -> dict:
         """Attributs supplémentaires avec les valeurs par vent"""
         return {
-            "rcth_lw": round(self._coordinator.data.rcth_lw, 2),
-            "rcth_hw": round(self._coordinator.data.rcth_hw, 2),
-            "rcth_calculated": round(self._coordinator.data.rcth_calculated, 2),
-            "last_error": self._coordinator.data.last_rcth_error,
+            "rcth_lw": round(self.coordinator.data.rcth_lw, 2),
+            "rcth_hw": round(self.coordinator.data.rcth_hw, 2),
+            "rcth_calculated": round(self.coordinator.data.rcth_calculated, 2),
+            "last_error": self.coordinator.data.last_rcth_error,
         }
 
 
@@ -266,7 +254,7 @@ class SmartHRTRPthSensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> float | None:
-        return round(self._coordinator.data.rpth, 2)
+        return round(self.coordinator.data.rpth, 2)
 
     @property
     def icon(self) -> str | None:
@@ -284,10 +272,10 @@ class SmartHRTRPthSensor(SmartHRTBaseSensor):
     def extra_state_attributes(self) -> dict:
         """Attributs supplémentaires avec les valeurs par vent"""
         return {
-            "rpth_lw": round(self._coordinator.data.rpth_lw, 2),
-            "rpth_hw": round(self._coordinator.data.rpth_hw, 2),
-            "rpth_calculated": round(self._coordinator.data.rpth_calculated, 2),
-            "last_error": self._coordinator.data.last_rpth_error,
+            "rpth_lw": round(self.coordinator.data.rpth_lw, 2),
+            "rpth_hw": round(self.coordinator.data.rpth_hw, 2),
+            "rpth_calculated": round(self.coordinator.data.rpth_calculated, 2),
+            "last_error": self.coordinator.data.last_rpth_error,
         }
 
 
@@ -303,7 +291,7 @@ class SmartHRTRCthFastSensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> float | None:
-        return round(self._coordinator.data.rcth_fast, 2)
+        return round(self.coordinator.data.rcth_fast, 2)
 
     @property
     def icon(self) -> str | None:
@@ -332,7 +320,7 @@ class SmartHRTWindSpeedForecastSensor(SmartHRTWindSensor):
 
     @property
     def native_value(self) -> float | None:
-        return round(self._coordinator.data.wind_speed_forecast_avg, 1)
+        return round(self.coordinator.data.wind_speed_forecast_avg, 1)
 
 
 class SmartHRTTemperatureForecastSensor(SmartHRTTemperatureSensor):
@@ -349,7 +337,7 @@ class SmartHRTTemperatureForecastSensor(SmartHRTTemperatureSensor):
 
     @property
     def native_value(self) -> float | None:
-        return round(self._coordinator.data.temperature_forecast_avg, 1)
+        return round(self.coordinator.data.temperature_forecast_avg, 1)
 
 
 class SmartHRTWindSpeedAvgSensor(SmartHRTWindSensor):
@@ -367,8 +355,8 @@ class SmartHRTWindSpeedAvgSensor(SmartHRTWindSensor):
     @property
     def native_value(self) -> float | None:
         return (
-            round(self._coordinator.data.wind_speed_avg, 2)
-            if self._coordinator.data.wind_speed_avg
+            round(self.coordinator.data.wind_speed_avg, 2)
+            if self.coordinator.data.wind_speed_avg
             else None
         )
 
@@ -386,7 +374,7 @@ class SmartHRTNightStateSensor(SmartHRTBaseSensor):
     @property
     def native_value(self) -> int:
         # Vérifier l'état du soleil
-        sun_state = self._coordinator._hass.states.get("sun.sun")
+        sun_state = self.coordinator._hass.states.get("sun.sun")
         if sun_state and sun_state.state == "below_horizon":
             return 1
         return 0
@@ -410,7 +398,7 @@ class SmartHRTRecoveryCalcModeSensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> str:
-        return "on" if self._coordinator.data.recovery_calc_mode else "off"
+        return "on" if self.coordinator.data.recovery_calc_mode else "off"
 
     @property
     def icon(self) -> str | None:
@@ -429,7 +417,7 @@ class SmartHRTRPCalcModeSensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> str:
-        return "on" if self._coordinator.data.rp_calc_mode else "off"
+        return "on" if self.coordinator.data.rp_calc_mode else "off"
 
     @property
     def icon(self) -> str | None:
@@ -448,7 +436,7 @@ class SmartHRTStopLagDurationSensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> float | None:
-        return round(self._coordinator.data.stop_lag_duration, 0)
+        return round(self.coordinator.data.stop_lag_duration, 0)
 
     @property
     def icon(self) -> str | None:
@@ -475,7 +463,7 @@ class SmartHRTTimeToRecoverySensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> float | None:
-        return self._coordinator.get_time_to_recovery_hours()
+        return self.coordinator.get_time_to_recovery_hours()
 
     @property
     def icon(self) -> str | None:
@@ -492,10 +480,10 @@ class SmartHRTTimeToRecoverySensor(SmartHRTBaseSensor):
     @property
     def extra_state_attributes(self) -> dict:
         """Attributs supplémentaires avec les erreurs du dernier cycle"""
-        recovery_start = self._coordinator.data.recovery_start_hour
+        recovery_start = self.coordinator.data.recovery_start_hour
         return {
-            "last_rcth_error": self._coordinator.data.last_rcth_error,
-            "last_rpth_error": self._coordinator.data.last_rpth_error,
+            "last_rcth_error": self.coordinator.data.last_rcth_error,
+            "last_rpth_error": self.coordinator.data.last_rpth_error,
             # ADR-014: Conversion en heure locale pour l'affichage
             "recovery_start_hour": (
                 dt_util.as_local(recovery_start).isoformat() if recovery_start else None
@@ -539,22 +527,22 @@ class SmartHRTStateSensor(SmartHRTBaseSensor):
 
     @property
     def native_value(self) -> str:
-        return self._coordinator.data.current_state
+        return self.coordinator.data.current_state
 
     @property
     def icon(self) -> str | None:
-        state = self._coordinator.data.current_state
+        state = self.coordinator.data.current_state
         return self.STATE_ICONS.get(state, "mdi:state-machine")
 
     @property
     def extra_state_attributes(self) -> dict:
         """Attributs supplémentaires avec le label lisible de l'état"""
-        state = self._coordinator.data.current_state
+        state = self.coordinator.data.current_state
         return {
             "state_label": self.STATE_LABELS.get(state, state),
-            "recovery_calc_mode": self._coordinator.data.recovery_calc_mode,
-            "rp_calc_mode": self._coordinator.data.rp_calc_mode,
-            "temp_lag_detection_active": self._coordinator.data.temp_lag_detection_active,
+            "recovery_calc_mode": self.coordinator.data.recovery_calc_mode,
+            "rp_calc_mode": self.coordinator.data.rp_calc_mode,
+            "temp_lag_detection_active": self.coordinator.data.temp_lag_detection_active,
         }
 
 
@@ -606,8 +594,8 @@ class SmartHRTRecoveryStartTimestampSensor(SmartHRTTimestampSensor):
     @property
     def native_value(self):
         """Retourne le datetime de relance (timezone-aware)."""
-        if self._coordinator.data.recovery_start_hour:
-            return dt_util.as_local(self._coordinator.data.recovery_start_hour)
+        if self.coordinator.data.recovery_start_hour:
+            return dt_util.as_local(self.coordinator.data.recovery_start_hour)
         return None
 
 
@@ -626,12 +614,12 @@ class SmartHRTTargetHourTimestampSensor(SmartHRTTimestampSensor):
     @property
     def native_value(self):
         """Retourne le datetime de l'heure cible (timezone-aware)."""
-        if self._coordinator.data.target_hour:
+        if self.coordinator.data.target_hour:
             # Créer un datetime pour aujourd'hui ou demain
             now = dt_util.now()
             target_dt = now.replace(
-                hour=self._coordinator.data.target_hour.hour,
-                minute=self._coordinator.data.target_hour.minute,
+                hour=self.coordinator.data.target_hour.hour,
+                minute=self.coordinator.data.target_hour.minute,
                 second=0,
                 microsecond=0,
             )
@@ -657,12 +645,12 @@ class SmartHRTRecoveryCalcHourTimestampSensor(SmartHRTTimestampSensor):
     @property
     def native_value(self):
         """Retourne le datetime de l'heure de coupure chauffage (timezone-aware)."""
-        if self._coordinator.data.recoverycalc_hour:
+        if self.coordinator.data.recoverycalc_hour:
             # Créer un datetime pour aujourd'hui ou demain
             now = dt_util.now()
             calc_dt = now.replace(
-                hour=self._coordinator.data.recoverycalc_hour.hour,
-                minute=self._coordinator.data.recoverycalc_hour.minute,
+                hour=self.coordinator.data.recoverycalc_hour.hour,
+                minute=self.coordinator.data.recoverycalc_hour.minute,
                 second=0,
                 microsecond=0,
             )

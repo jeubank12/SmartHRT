@@ -72,6 +72,10 @@ class MockHass:
             self.loop = asyncio.get_running_loop()
         except RuntimeError:
             self.loop = asyncio.new_event_loop()
+        # ADR-027: Attribut requis par DataUpdateCoordinator pour la validation thread-safe
+        import threading
+
+        self.loop_thread_id = threading.get_ident()
 
     async def async_add_executor_job(self, func, *args, **kwargs):
         """Exécute une fonction de manière synchrone pour les tests."""
@@ -192,6 +196,11 @@ def create_coordinator(mock_hass, mock_entry, mock_store):
     async def _create_coordinator(
         initial_state: str = SmartHRTState.HEATING_ON, **data_overrides
     ) -> SmartHRTCoordinator:
+        # Configurer le frame helper pour DataUpdateCoordinator (ADR-027)
+        from homeassistant.helpers import frame as frame_helper
+
+        frame_helper._hass.hass = mock_hass
+
         with (
             patch(
                 "custom_components.SmartHRT.coordinator.Store", return_value=mock_store
