@@ -473,6 +473,11 @@ class SmartHRTCoordinator:
                 )
 
         # Trigger pour recovery_update_hour (mise à jour calcul)
+        # Annuler d'abord le trigger géré par _schedule_recovery_update pour éviter les doublons
+        if self._unsub_recovery_update:
+            self._unsub_recovery_update()
+            self._unsub_recovery_update = None
+
         if self.data.recovery_update_hour:
             recovery_update = self.data.recovery_update_hour
             if recovery_update.tzinfo is None:
@@ -1663,12 +1668,45 @@ class SmartHRTCoordinator:
         self._hass.async_create_task(self._save_learned_data())
 
     def set_recoverycalc_hour(self, value: dt_time) -> None:
-        """Définit l'heure de coupure chauffage"""
+        """Définit l'heure de coupure chauffage.
+
+        Si l'ancienne heure de coupure vient de passer et que le système est
+        encore en HEATING_ON, déclenche immédiatement la transition vers
+        DETECTING_LAG pour éviter de manquer le trigger.
+        """
+        now = dt_util.now()
+        old_value = self.data.recoverycalc_hour
+
+        # Calcul de l'ancienne heure de coupure pour aujourd'hui
+        old_recoverycalc_dt = now.replace(
+            hour=old_value.hour,
+            minute=old_value.minute,
+            second=0,
+            microsecond=0,
+        )
+
+        # Vérifier si l'ancienne heure vient de passer (dans les 5 dernières minutes)
+        # et que le système est encore en HEATING_ON
+        time_since_old_trigger = (now - old_recoverycalc_dt).total_seconds()
+        should_trigger_now = (
+            self.data.current_state == SmartHRTState.HEATING_ON
+            and 0 <= time_since_old_trigger <= 300  # 5 minutes de marge
+        )
+
         self.data.recoverycalc_hour = value
         self._setup_time_triggers()  # Reconfigure les triggers
         self._notify_listeners()
         # Persister la nouvelle valeur
         self._hass.async_create_task(self._save_learned_data())
+
+        # Déclencher immédiatement si l'ancien trigger aurait dû se produire
+        if should_trigger_now:
+            _LOGGER.info(
+                "%s Ancienne heure de coupure %s vient de passer, déclenchement immédiat",
+                self._log_prefix(),
+                old_value,
+            )
+            self._hass.async_create_task(self._async_on_recoverycalc_hour())
 
     def set_smartheating_mode(self, value: bool) -> None:
         self.data.smartheating_mode = value

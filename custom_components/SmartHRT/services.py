@@ -23,14 +23,12 @@ from .const import (
     SERVICE_ON_RECOVERY_END,
     SERVICE_RESET_LEARNING,
     SERVICE_TRIGGER_CALCULATION,
+    SERVICE_START_HEATING_CYCLE,
+    SERVICE_STOP_HEATING,
+    SERVICE_START_RECOVERY,
+    SERVICE_END_RECOVERY,
+    SERVICE_GET_STATE,
 )
-
-# Nouveaux services simplifiés
-SERVICE_START_HEATING_CYCLE = "start_heating_cycle"
-SERVICE_STOP_HEATING = "stop_heating"
-SERVICE_START_RECOVERY = "start_recovery"
-SERVICE_END_RECOVERY = "end_recovery"
-SERVICE_GET_STATE = "get_state"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -345,8 +343,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        # Appel à la méthode _on_recoverycalc_hour qui gère la transition proprement
-        await coord._on_recoverycalc_hour(None)
+        # Appel à la méthode async qui gère la transition proprement
+        # Note: _on_recoverycalc_hour est synchrone (@callback), on appelle directement la version async
+        await coord._async_on_recoverycalc_hour()
 
         return {
             "success": True,
