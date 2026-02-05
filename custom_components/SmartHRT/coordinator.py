@@ -723,6 +723,11 @@ class SmartHRTCoordinator:
                 update_time,
             )
 
+        # Sauvegarder les données mises à jour (recovery_start_hour notamment)
+        # pour éviter de restaurer des valeurs obsolètes au redémarrage
+        if self.data.recovery_calc_mode:
+            await self._save_learned_data()
+
         self._notify_listeners()
 
     def _reschedule_recoverycalc_hour(self) -> None:
@@ -1308,6 +1313,10 @@ class SmartHRTCoordinator:
 
         self.calculate_recovery_time()
 
+        # Programmer le trigger de relance avec la nouvelle heure calculée
+        if self.data.recovery_start_hour:
+            self._schedule_recovery_start(self.data.recovery_start_hour)
+
         # Calculer et programmer la prochaine mise à jour (comme dans le YAML)
         update_time = self.calculate_recovery_update_time()
         if update_time:
@@ -1608,6 +1617,11 @@ class SmartHRTCoordinator:
         """
         if not self.data.rp_calc_mode:
             return
+
+        # Annuler le trigger de recovery_start pour éviter tout déclenchement parasite
+        if self._unsub_recovery_start:
+            self._unsub_recovery_start()
+            self._unsub_recovery_start = None
 
         self.data.time_recovery_end = dt_util.now()
         self.data.temp_recovery_end = self.data.interior_temp or 17.0
