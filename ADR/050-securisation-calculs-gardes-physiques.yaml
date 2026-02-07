@@ -1,0 +1,248 @@
+id: 050
+title: "Sécurisation des Calculs par Gardes Physiques"
+status: "Proposé"
+date: "2026-02-07"
+context: |
+  Le module `thermal.py` contient la logique de calcul thermique. 
+  Actuellement, les erreurs mathématiques sont gérées par des blocs 
+  `try/except` génériques.
+
+  **Code actuel :**
+
+  ```python
+  # thermal.py
+  def calculate_recovery_duration(
+      self,
+      interior_temp: float,
+      exterior_temp: float,
+      target_temp: float,
+      rcth: float,
+      wind_speed: float,
+  ) -> float | None:
+      """Calcule le temps de récupération thermique."""
+      try:
+          # Calcul impliquant un logarithme
+          delta_t_start = interior_temp - exterior_temp
+          delta_t_end = target_temp - exterior_temp
+          
+          # ⚠️ Peut échouer si delta_t_start <= 0 ou delta_t_end <= 0
+          ratio = delta_t_start / delta_t_end
+          duration = -rcth * math.log(ratio)
+          
+          return duration
+      except Exception:
+          _LOGGER.exception("Erreur lors du calcul thermique")
+          return None
+  ```
+
+  **Problèmes identifiés :**
+
+  1. **Masquage d'erreurs de logique** : Le `except Exception` capture tout, 
+     y compris des bugs dans le code (ex: `TypeError` si un argument est 
+     `None`).
+
+  2. **Situations physiquement impossibles non détectées** :
+     - `interior_temp >= exterior_temp` en mode chauffage → pas de perte 
+       thermique, le calcul n'a pas de sens.
+     - `target_temp <= exterior_temp` → impossible d'atteindre la cible 
+       par chauffage.
+
+  3. **Logarithme de valeur négative ou nulle** : Si les conditions 
+     physiques sont invalides, `math.log()` lève `ValueError` qui est 
+     capturé silencieusement.
+
+  4. **Retour `None` ambigu** : On ne sait pas si `None` signifie "erreur 
+     de calcul" ou "situation physique invalide".
+
+  5. **Logs non informatifs** : Le message d'exception ne dit pas *pourquoi* 
+     le calcul a échoué.
+
+  **Contraintes physiques du modèle :**
+
+  Pour un calcul de temps de récupération thermique (chauffage) :
+  - `interior_temp < target_temp` (sinon déjà à température)
+  - `exterior_temp < interior_temp` (sinon pas de perte thermique)
+  - `exterior_temp < target_temp` (sinon impossible à atteindre)
+  - `rcth > 0` (constante de temps positive)
+
+decision: |
+  Remplacer la gestion d'exception générique par des "Gardes Physiques" 
+  (Physics Guards) explicites avant les calculs.
+
+  **1. Définition des gardes physiques :**
+
+  ```python
+  # thermal.py
+  from dataclasses import dataclass
+  from enum import StrEnum
+
+  class PhysicsGuardResult(StrEnum):
+      """Résultat de la validation des contraintes physiques."""
+      VALID = "valid"
+      ALREADY_AT_TARGET = "already_at_target"
+      NO_HEAT_LOSS = "no_heat_loss"
+      TARGET_UNREACHABLE = "target_unreachable"
+      INVALID_COEFFICIENT = "invalid_coefficient"
+      EXTERIOR_WARMER = "exterior_warmer"
+
+  @dataclass(frozen=True)
+  class PhysicsValidation:
+      """Résultat de validation avec contexte."""
+      result: PhysicsGuardResult
+      message: str | None = None
+      suggested_value: float | None = None  # Pour certains cas limites
+  ```
+
+  **2. Fonction de validation séparée :**
+
+  ```python
+  def validate_recovery_physics(
+      interior_temp: float,
+      exterior_temp: float,
+      target_temp: float,
+      rcth: float,
+  ) -> PhysicsValidation:
+      """Valide les contraintes physiques pour le calcul de recovery.
+      
+      Args:
+          interior_temp: Température intérieure actuelle (°C)
+          exterior_temp: Température extérieure (°C)
+          target_temp: Température cible (°C)
+          rcth: Constante de temps thermique (secondes)
+      
+      Returns:
+          PhysicsValidation avec le résultat et un message explicatif.
+      """
+      # Garde 1: Coefficient valide
+      if rcth <= 0:
+          return PhysicsValidation(
+              PhysicsGuardResult.INVALID_COEFFICIENT,
+              f"rcth doit être positif, reçu: {rcth}",
+          )
+      
+      # Garde 2: Déjà à température cible
+      if interior_temp >= target_temp:
+          return PhysicsValidation(
+              PhysicsGuardResult.ALREADY_AT_TARGET,
+              f"Température intérieure ({interior_temp}°C) >= cible ({target_temp}°C)",
+              suggested_value=0.0,  # Pas de temps de récupération nécessaire
+          )
+      
+      # Garde 3: Pas de perte thermique (extérieur plus chaud)
+      if exterior_temp >= interior_temp:
+          return PhysicsValidation(
+              PhysicsGuardResult.NO_HEAT_LOSS,
+              f"Extérieur ({exterior_temp}°C) >= intérieur ({interior_temp}°C)",
+              suggested_value=0.0,  # Chauffage passif par l'extérieur
+          )
+      
+      # Garde 4: Cible inatteignable
+      if target_temp <= exterior_temp:
+          return PhysicsValidation(
+              PhysicsGuardResult.TARGET_UNREACHABLE,
+              f"Cible ({target_temp}°C) <= extérieur ({exterior_temp}°C)",
+          )
+      
+      return PhysicsValidation(PhysicsGuardResult.VALID)
+  ```
+
+  **3. Calcul avec gardes intégrées :**
+
+  ```python
+  def calculate_recovery_duration(
+      self,
+      interior_temp: float,
+      exterior_temp: float,
+      target_temp: float,
+      rcth: float,
+      wind_speed: float = 0.0,
+  ) -> float | None:
+      """Calcule le temps de récupération thermique.
+      
+      Returns:
+          Durée en secondes, 0.0 si déjà à température, None si impossible.
+      """
+      # Validation physique explicite
+      validation = validate_recovery_physics(
+          interior_temp, exterior_temp, target_temp, rcth
+      )
+      
+      if validation.result == PhysicsGuardResult.VALID:
+          # Calcul sûr - les gardes garantissent que log() est valide
+          delta_t_start = interior_temp - exterior_temp
+          delta_t_end = target_temp - exterior_temp
+          ratio = delta_t_start / delta_t_end
+          
+          # ratio est garanti dans ]0, 1[ grâce aux gardes
+          duration = -rcth * math.log(ratio)
+          return max(0.0, duration)  # Garde finale de sécurité
+      
+      if validation.suggested_value is not None:
+          _LOGGER.debug(
+              "Calcul recovery: %s - utilisation valeur suggérée %.1f",
+              validation.message,
+              validation.suggested_value,
+          )
+          return validation.suggested_value
+      
+      _LOGGER.warning(
+          "Calcul recovery impossible: %s",
+          validation.message,
+      )
+      return None
+  ```
+
+  **4. Suppression des except génériques :**
+
+  ```python
+  # ❌ Avant
+  try:
+      result = complex_calculation()
+  except Exception:
+      return None
+
+  # ✅ Après
+  validation = validate_physics(...)
+  if validation.result != PhysicsGuardResult.VALID:
+      return handle_invalid_physics(validation)
+
+  # Calcul garanti sûr
+  result = calculation()  # Pas de try/except
+  ```
+
+consequences: |
+  **Positif :**
+
+  - **Code auto-documenté** : Les contraintes physiques du modèle sont 
+    explicites dans le code. Un développeur comprend immédiatement les 
+    limites du modèle.
+
+  - **Logs pertinents** : On sait exactement *pourquoi* un calcul est 
+    rejeté ou donne une valeur par défaut.
+
+  - **Débogage facilité** : Plus de "None mystérieux". Chaque cas a une 
+    explication claire.
+
+  - **Meilleure gestion des cas limites** : Les situations comme "déjà à 
+    température" retournent 0.0 au lieu de None, ce qui est sémantiquement 
+    correct.
+
+  - **Détection de bugs** : Les vraies erreurs (bugs de code, TypeError) 
+    ne sont plus masquées et remontent correctement.
+
+  **Négatif :**
+
+  - **Légère augmentation de la verbosité** : Le code dans `thermal.py` 
+    est plus long (~30-50 lignes supplémentaires pour les fonctions de 
+    validation).
+
+  - **Performance marginalement impactée** : Les validations ajoutent 
+    quelques comparaisons. Impact négligeable (~microseconds).
+
+  **Neutre :**
+
+  - Les tests existants peuvent nécessiter une adaptation pour vérifier 
+    les nouveaux cas de retour (0.0 vs None).
+
+  - La fonction `validate_*` peut être réutilisée pour afficher des 
+    messages utilisateur explicatifs dans les sensors.

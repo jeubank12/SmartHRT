@@ -1,0 +1,188 @@
+id: 049
+title: "Suppression du Forçage d'État et Transitions Explicites"
+status: "Proposé"
+date: "2026-02-07"
+context: |
+  La méthode `force_state` est utilisée pour restaurer l'état après un 
+  redémarrage de Home Assistant ou via des services API de débogage.
+
+  **Code actuel :**
+
+  ```python
+  # state_machine.py
+  def force_state(self, state: SmartHRTState) -> None:
+      """Force l'état sans vérifier les transitions valides.
+      
+      ⚠️ Usage limité : restauration après redémarrage, debug.
+      """
+      self._state = state
+      # Pas d'appel aux callbacks on_enter/on_exit !
+  ```
+
+  **Utilisation problématique :**
+
+  ```python
+  # coordinator.py - restauration après redémarrage
+  async def _restore_state(self) -> None:
+      stored_state = await self._load_persisted_state()
+      if stored_state:
+          self.state_machine.force_state(stored_state)
+          # ⚠️ Les timers ne sont pas reprogrammés !
+          # ⚠️ Les variables d'état ne sont pas initialisées !
+  ```
+
+  **Problèmes identifiés :**
+
+  1. **Contournement de la logique métier** : `force_state` ne déclenche 
+     pas les callbacks `on_enter` qui initialisent :
+     - Les timers (`_schedule_recovery_update`)
+     - Les snapshots de données (`_snapshot_recovery_start`)
+     - Les flags internes (`_recovery_in_progress = True`)
+
+  2. **État incohérent** : Le système peut se retrouver dans l'état 
+     `MONITORING` sans timer actif, ou `RECOVERY` sans snapshot initial.
+
+  3. **Débogage difficile** : La "téléportation" d'état n'apparaît pas 
+     dans les logs de transition, rendant le debugging complexe.
+
+  4. **Violation du principe d'invariants** : Chaque état devrait avoir 
+     des invariants garantis (ex: `MONITORING` ⟹ timer actif). `force_state` 
+     viole ces invariants.
+
+  **Exemple de bug potentiel :**
+
+  ```python
+  # Après redémarrage, état MONITORING restauré via force_state
+  # Mais aucun timer n'est programmé → le prochain calcul ne se fera jamais
+  ```
+
+decision: |
+  Interdire l'usage de `force_state` pour la logique métier courante et 
+  introduire des transitions explicites depuis un état initial.
+
+  **1. Introduction d'un état `INITIALIZING` :**
+
+  ```python
+  class SmartHRTState(StrEnum):
+      INITIALIZING = "initializing"  # État de départ après (re)démarrage
+      UNKNOWN = "unknown"            # État indéterminé (erreur)
+      MONITORING = "monitoring"
+      RECOVERY = "recovery"
+      HEATING_PROCESS = "heating_process"
+      DETECTING_LAG = "detecting_lag"
+  ```
+
+  **2. Définition des transitions depuis `INITIALIZING` :**
+
+  ```python
+  VALID_TRANSITIONS: dict[SmartHRTState, set[SmartHRTState]] = {
+      SmartHRTState.INITIALIZING: {
+          SmartHRTState.MONITORING,      # Démarrage normal
+          SmartHRTState.RECOVERY,        # Recovery en cours lors du restart
+          SmartHRTState.HEATING_PROCESS, # Heating en cours lors du restart
+          SmartHRTState.DETECTING_LAG,   # Détection en cours lors du restart
+          SmartHRTState.UNKNOWN,         # Erreur de restauration
+      },
+      SmartHRTState.MONITORING: {...},
+      # ... autres transitions existantes
+  }
+  ```
+
+  **3. Callbacks `on_enter` pour chaque état rétabli :**
+
+  ```python
+  # state_handlers.py
+  def _on_enter_monitoring_from_init(self) -> list[Action]:
+      """Entrée en MONITORING depuis INITIALIZING.
+      
+      Reprogramme les timers nécessaires.
+      """
+      return [
+          Action.SCHEDULE_RECOVERY_UPDATE,
+          Action.LOG_STATE_RESTORED,
+      ]
+
+  def _on_enter_recovery_from_init(self) -> list[Action]:
+      """Entrée en RECOVERY depuis INITIALIZING.
+      
+      Restaure le contexte de recovery en cours.
+      """
+      return [
+          Action.RESTORE_RECOVERY_CONTEXT,  # Recharge les timestamps
+          Action.SCHEDULE_RECOVERY_END_CHECK,
+          Action.LOG_STATE_RESTORED,
+      ]
+  ```
+
+  **4. La restauration utilise `transition_to` standard :**
+
+  ```python
+  async def _restore_state(self) -> None:
+      """Restaure l'état après redémarrage."""
+      # Toujours partir de INITIALIZING
+      self.state_machine = SmartHRTStateMachine(
+          initial_state=SmartHRTState.INITIALIZING
+      )
+      
+      stored_state = await self._load_persisted_state()
+      target_state = stored_state or SmartHRTState.MONITORING
+      
+      # Transition normale → déclenche on_enter avec ses effets de bord
+      result = self.state_machine.transition_with_actions(target_state)
+      
+      if result.success:
+          await self._execute_actions(result.actions)
+      else:
+          _LOGGER.error("Impossible de restaurer l'état %s", target_state)
+          self.state_machine.transition_to(SmartHRTState.UNKNOWN)
+  ```
+
+  **5. `force_state` devient privé et documenté :**
+
+  ```python
+  def _force_state_unsafe(self, state: SmartHRTState) -> None:
+      """Force l'état sans effets de bord.
+      
+      ⛔ USAGE INTERDIT sauf pour les tests unitaires.
+      
+      Pour la restauration d'état, utiliser transition_to depuis
+      INITIALIZING qui garantit l'exécution des callbacks appropriés.
+      """
+      self._state = state
+  ```
+
+consequences: |
+  **Positif :**
+
+  - **Garantie d'intégrité** : On ne peut pas être dans un état sans que 
+    ses pré-requis (timers, variables) soient initialisés. Les invariants 
+    d'état sont toujours respectés.
+
+  - **Débogage facilité** : Toutes les transitions apparaissent dans les 
+    logs, y compris celles après redémarrage. Plus de "téléportation" 
+    invisible.
+
+  - **Code auto-documenté** : Les transitions depuis `INITIALIZING` 
+    décrivent explicitement ce qui doit être initialisé pour chaque état.
+
+  - **Testabilité améliorée** : Les tests peuvent vérifier que la 
+    restauration d'état programme bien les bons timers.
+
+  **Négatif :**
+
+  - **Complexité initiale** : Nécessite de définir les callbacks 
+    `on_enter_*_from_init` pour chaque état cible.
+
+  - **Migration des tests** : Les tests qui utilisaient `force_state` 
+    doivent être adaptés pour utiliser soit la méthode privée 
+    `_force_state_unsafe` (pour le setup), soit des transitions normales.
+
+  **Cas particuliers :**
+
+  - **Service de debug `force_state`** : Si un service admin doit forcer 
+    un état, il doit passer par `transition_to` depuis l'état courant, 
+    ou reset vers `INITIALIZING` puis transitionner.
+
+  - **Tests unitaires** : Peuvent utiliser `_force_state_unsafe` pour 
+    le setup de test, mais les tests d'intégration doivent utiliser 
+    les transitions normales.

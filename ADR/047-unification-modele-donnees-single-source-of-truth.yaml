@@ -1,0 +1,150 @@
+id: 047
+title: "Unification du Modèle de Données (Single Source of Truth)"
+status: "Proposé"
+date: "2026-02-07"
+context: |
+  Actuellement, les données transitent entre trois formats distincts :
+
+  1. **`SmartHRTData`** : Dataclass mutable utilisée en mémoire pour stocker 
+     l'état du système.
+
+  2. **`PersistedDataModel`** : Modèle Pydantic utilisé pour la validation 
+     lors de la lecture/écriture des données persistées.
+
+  3. **Dictionnaires JSON** : Sérialisation personnalisée via `serialization.py` 
+     avec `JSONEncoder` pour gérer les types non-natifs.
+
+  **Architecture actuelle :**
+
+  ```
+  SmartHRTData (mémoire)
+        │
+        ├──► as_dict() ──► PersistedDataModel.model_validate() ──► JSON
+        │
+        └──◄ from_dict() ◄── PersistedDataModel ◄── JSON
+  ```
+
+  **Problèmes identifiés :**
+
+  1. **Duplication des valeurs par défaut** : Les mêmes valeurs par défaut 
+     sont définies dans `SmartHRTData`, `PersistedDataModel`, et parfois 
+     dans `PERSISTED_FIELDS`.
+
+  2. **Complexité de maintenance** : Ajouter un nouveau champ nécessite des 
+     modifications dans 3 endroits différents.
+
+  3. **Cycles de conversion CPU inutiles** : Chaque sauvegarde/lecture 
+     effectue des conversions `dataclass ↔ dict ↔ Pydantic ↔ JSON`.
+
+  4. **Pas de validation en mémoire** : Les données dans `SmartHRTData` ne 
+     sont validées qu'au moment de la persistance, pas à l'assignation.
+
+  5. **Risque de désynchronisation** : Les trois sources peuvent diverger 
+     silencieusement (ex: valeur par défaut différente).
+
+decision: |
+  Fusionner `SmartHRTData` et `PersistedDataModel` en une seule entité 
+  utilisant **Pydantic Dataclasses** ou un modèle Pydantic v2 direct.
+
+  **1. `SmartHRTData` devient le modèle unique validé :**
+
+  ```python
+  from pydantic import BaseModel, Field, field_validator
+  from datetime import datetime, time as dt_time
+  from collections import deque
+  from typing import Annotated
+
+  class SmartHRTData(BaseModel):
+      """Modèle de données unique pour SmartHRT.
+      
+      Validé à l'instanciation ET à chaque modification (via model_validate).
+      """
+      model_config = ConfigDict(
+          validate_assignment=True,  # Validation à chaque assignation
+          arbitrary_types_allowed=True,  # Pour deque
+          ser_json_timedelta="float",
+      )
+      
+      # Coefficients thermiques avec contraintes
+      rcth: Annotated[float, Field(ge=100, le=20000)] = 2000.0
+      rpth: Annotated[float, Field(ge=100, le=20000)] = 2000.0
+      
+      # Timestamps
+      recovery_start_hour: datetime | None = None
+      target_hour: dt_time | None = None
+      
+      # État machine
+      current_state: SmartHRTState = SmartHRTState.UNKNOWN
+      
+      # Historique vent (type personnalisé)
+      wind_speed_history: deque[float] = Field(
+          default_factory=lambda: deque(maxlen=6)
+      )
+      
+      @field_validator("wind_speed_history", mode="before")
+      @classmethod
+      def convert_list_to_deque(cls, v):
+          if isinstance(v, list):
+              return deque(v, maxlen=6)
+          return v
+  ```
+
+  **2. Sérialisation native Pydantic :**
+
+  ```python
+  # Sauvegarde
+  data_dict = self.data.model_dump(mode="json")
+  await self.store.async_save(data_dict)
+
+  # Restauration
+  raw_data = await self.store.async_load()
+  self.data = SmartHRTData.model_validate(raw_data)
+  ```
+
+  **3. Suppression de `serialization.py` :**
+
+  Le module `serialization.py` et la classe `JSONEncoder` personnalisée 
+  sont supprimés. Les sérialiseurs personnalisés Pydantic remplacent cette 
+  logique :
+
+  ```python
+  from pydantic import PlainSerializer, BeforeValidator
+
+  DequeFloat = Annotated[
+      deque[float],
+      BeforeValidator(lambda v: deque(v, maxlen=6) if isinstance(v, list) else v),
+      PlainSerializer(lambda d: list(d)),
+  ]
+  ```
+
+consequences: |
+  **Positif :**
+
+  - **Réduction drastique du code** : Suppression de `serialization.py`, 
+    `PersistedDataModel`, et des conversions manuelles dans le coordinateur.
+    Estimation : -200 à -300 lignes de code.
+
+  - **Garantie d'intégrité** : Les données en mémoire respectent toujours les 
+    contraintes grâce à `validate_assignment=True`. Plus besoin de vérifier 
+    les bornes dans les setters.
+
+  - **Maintenabilité** : Un seul endroit pour définir un champ (type, 
+    contraintes, valeur par défaut, sérialisation).
+
+  - **Migration simplifiée** : La migration de version des données peut 
+    utiliser les mécanismes natifs de Pydantic (`model_validator`).
+
+  **Négatif :**
+
+  - **Migration nécessaire** : Les données déjà persistées (format ancien) 
+    doivent être migrées. Cela est géré par le système de versionning du 
+    Store déjà en place.
+
+  - **Dépendance Pydantic renforcée** : Le système devient plus fortement 
+    couplé à Pydantic v2. C'est acceptable car Pydantic est déjà une 
+    dépendance standard de Home Assistant.
+
+  **Neutre :**
+
+  - **Performance équivalente** : Pydantic v2 (Rust core) est aussi performant 
+    voire plus rapide que les conversions manuelles actuelles.

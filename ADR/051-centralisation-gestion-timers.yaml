@@ -1,0 +1,269 @@
+id: 051
+title: "Centralisation de la Gestion des Timers"
+status: "Proposé"
+date: "2026-02-07"
+context: |
+  Les gestionnaires de désabonnement (unsubscribe callbacks) pour les timers 
+  sont actuellement manipulés manuellement à plusieurs endroits du code.
+
+  **Code actuel :**
+
+  ```python
+  # coordinator.py
+  class SmartHRTCoordinator:
+      def __init__(self, ...):
+          self._unsub_recovery_start: Callable[[], None] | None = None
+          self._unsub_recovery_end: Callable[[], None] | None = None
+          self._unsub_time_triggers: Callable[[], None] | None = None
+          self._unsub_periodic_update: Callable[[], None] | None = None
+          # ... potentiellement d'autres timers
+      
+      async def _schedule_recovery_start(self, target_time: datetime) -> None:
+          """Planifie le démarrage de la récupération."""
+          # ⚠️ Risque: l'ancien timer n'est pas annulé
+          self._unsub_recovery_start = async_track_point_in_time(
+              self.hass,
+              self._on_recovery_start,
+              target_time,
+          )
+      
+      async def _cancel_recovery_timers(self) -> None:
+          """Annule les timers de récupération."""
+          if self._unsub_recovery_start:
+              self._unsub_recovery_start()
+              self._unsub_recovery_start = None
+          # ⚠️ Duplication: même pattern pour chaque timer
+          if self._unsub_recovery_end:
+              self._unsub_recovery_end()
+              self._unsub_recovery_end = None
+  ```
+
+  **Problèmes identifiés :**
+
+  1. **Race conditions** : Si `_schedule_recovery_start` est appelée deux 
+     fois rapidement, l'ancien timer n'est pas annulé. Les deux callbacks 
+     peuvent s'exécuter.
+
+  ```python
+  # Scénario de bug
+  await _schedule_recovery_start(time_1)  # Timer A créé
+  await _schedule_recovery_start(time_2)  # Timer B créé, Timer A oublié !
+  # → Timer A et Timer B vont tous deux s'exécuter
+  ```
+
+  2. **Références perdues (zombie timers)** : Si une exception interrompt 
+     le code entre l'annulation et la réassignation, la référence est perdue 
+     mais le timer reste actif.
+
+  3. **Code dupliqué** : Le pattern `if timer: timer(); timer = None` est 
+     répété pour chaque type de timer.
+
+  4. **Nettoyage (unload) fragile** : `async_unload_entry` doit lister 
+     manuellement tous les attributs `_unsub_*` à annuler.
+
+  5. **Pas de visibilité** : Difficile de savoir quels timers sont actifs 
+     à un moment donné pour le debugging.
+
+decision: |
+  Centraliser la gestion des timers dans une structure dédiée avec des 
+  méthodes atomiques garantissant l'annulation automatique.
+
+  **1. Création d'une classe `TimerManager` :**
+
+  ```python
+  # timer_manager.py
+  from collections.abc import Callable
+  from dataclasses import dataclass, field
+  from datetime import datetime
+  from typing import Any
+
+  from homeassistant.core import HomeAssistant, CALLBACK_TYPE
+  from homeassistant.helpers.event import async_track_point_in_time
+
+  @dataclass
+  class TimerInfo:
+      """Information sur un timer actif."""
+      key: str
+      scheduled_time: datetime
+      callback_name: str
+      unsub: CALLBACK_TYPE
+
+  class TimerManager:
+      """Gestionnaire centralisé des timers.
+      
+      Garantit qu'un seul timer par clé est actif à tout moment.
+      """
+      
+      def __init__(self, hass: HomeAssistant) -> None:
+          self._hass = hass
+          self._timers: dict[str, TimerInfo] = {}
+      
+      def schedule(
+          self,
+          key: str,
+          callback: Callable[[datetime], None],
+          target_time: datetime,
+      ) -> None:
+          """Planifie un timer, annulant tout timer existant pour cette clé.
+          
+          Args:
+              key: Identifiant unique du timer (ex: "recovery_start")
+              callback: Fonction à appeler au déclenchement
+              target_time: Heure de déclenchement
+          """
+          # Annulation atomique de l'ancien timer
+          self.cancel(key)
+          
+          # Création du nouveau timer
+          unsub = async_track_point_in_time(
+              self._hass,
+              callback,
+              target_time,
+          )
+          
+          self._timers[key] = TimerInfo(
+              key=key,
+              scheduled_time=target_time,
+              callback_name=callback.__name__,
+              unsub=unsub,
+          )
+          
+          _LOGGER.debug(
+              "Timer '%s' programmé pour %s (callback: %s)",
+              key,
+              target_time.isoformat(),
+              callback.__name__,
+          )
+      
+      def cancel(self, key: str) -> bool:
+          """Annule un timer par sa clé.
+          
+          Returns:
+              True si un timer a été annulé, False sinon.
+          """
+          timer_info = self._timers.pop(key, None)
+          if timer_info:
+              timer_info.unsub()
+              _LOGGER.debug("Timer '%s' annulé", key)
+              return True
+          return False
+      
+      def cancel_all(self) -> int:
+          """Annule tous les timers.
+          
+          Returns:
+              Nombre de timers annulés.
+          """
+          count = len(self._timers)
+          for timer_info in self._timers.values():
+              timer_info.unsub()
+          self._timers.clear()
+          _LOGGER.debug("Tous les timers annulés (%d)", count)
+          return count
+      
+      def is_active(self, key: str) -> bool:
+          """Vérifie si un timer est actif."""
+          return key in self._timers
+      
+      def get_info(self, key: str) -> TimerInfo | None:
+          """Retourne les informations d'un timer."""
+          return self._timers.get(key)
+      
+      @property
+      def active_timers(self) -> list[str]:
+          """Liste des clés de timers actifs."""
+          return list(self._timers.keys())
+      
+      def __repr__(self) -> str:
+          return f"TimerManager({self.active_timers})"
+  ```
+
+  **2. Constantes pour les clés de timers :**
+
+  ```python
+  # const.py
+  class TimerKey(StrEnum):
+      """Clés des timers gérés par le système."""
+      RECOVERY_START = "recovery_start"
+      RECOVERY_END = "recovery_end"
+      PERIODIC_UPDATE = "periodic_update"
+      NEXT_RECALC = "next_recalc"
+  ```
+
+  **3. Utilisation dans le coordinateur :**
+
+  ```python
+  # coordinator.py
+  class SmartHRTCoordinator:
+      def __init__(self, ...):
+          self._timer_manager = TimerManager(hass)
+      
+      async def _schedule_recovery_start(self, target_time: datetime) -> None:
+          """Planifie le démarrage de la récupération."""
+          self._timer_manager.schedule(
+              TimerKey.RECOVERY_START,
+              self._on_recovery_start,
+              target_time,
+          )
+      
+      async def _cancel_recovery_timers(self) -> None:
+          """Annule les timers de récupération."""
+          self._timer_manager.cancel(TimerKey.RECOVERY_START)
+          self._timer_manager.cancel(TimerKey.RECOVERY_END)
+      
+      async def async_unload(self) -> None:
+          """Décharge le coordinateur."""
+          self._timer_manager.cancel_all()
+  ```
+
+  **4. Diagnostic pour le debugging :**
+
+  ```python
+  # Service de diagnostic
+  def get_timer_diagnostics(self) -> dict[str, Any]:
+      """Retourne l'état des timers pour le diagnostic."""
+      return {
+          "active_timers": [
+              {
+                  "key": info.key,
+                  "scheduled_time": info.scheduled_time.isoformat(),
+                  "callback": info.callback_name,
+              }
+              for info in self._timer_manager._timers.values()
+          ]
+      }
+  ```
+
+consequences: |
+  **Positif :**
+
+  - **Élimination des race conditions** : L'annulation automatique dans 
+    `schedule()` garantit qu'un seul timer par clé est actif. Plus de 
+    double déclenchement possible.
+
+  - **Nettoyage robuste** : `cancel_all()` simplifie drastiquement 
+    `async_unload`. Plus besoin de lister tous les attributs `_unsub_*`.
+
+  - **Visibilité améliorée** : `active_timers` et `get_info()` permettent 
+    de déboguer facilement l'état des timers (intégrable dans diagnostics).
+
+  - **Code DRY** : Plus de duplication du pattern `if unsub: unsub(); unsub = None`.
+
+  - **Logs centralisés** : Tous les événements timer (création, annulation) 
+    sont loggés de manière cohérente.
+
+  **Négatif :**
+
+  - **Nouvelle dépendance interne** : Le coordinateur dépend de 
+    `TimerManager`. C'est acceptable car c'est une dépendance interne simple.
+
+  - **Légère indirection** : Un appel de méthode supplémentaire par rapport 
+    à l'appel direct de `async_track_point_in_time`. Impact négligeable.
+
+  **Neutre :**
+
+  - Les tests doivent être adaptés pour mocker `TimerManager` ou vérifier 
+    ses interactions.
+
+  - Le `TimerManager` peut être réutilisé dans d'autres intégrations si 
+    besoin (pattern générique).

@@ -1,0 +1,262 @@
+id: 052
+title: "Internationalisation Native (i18n)"
+status: "Proposé"
+date: "2026-02-07"
+context: |
+  Certains sensors et états de la machine définissent leurs noms ou valeurs 
+  avec des chaînes codées en dur dans le code Python.
+
+  **Exemples problématiques :**
+
+  ```python
+  # sensor.py
+  class SmartHRTStateSensor(SensorEntity):
+      @property
+      def native_value(self) -> str:
+          state = self.coordinator.data.current_state
+          # ❌ Chaînes en dur, non traduisibles
+          translations = {
+              SmartHRTState.MONITORING: "Surveillance",
+              SmartHRTState.RECOVERY: "Récupération en cours",
+              SmartHRTState.HEATING_PROCESS: "Chauffage actif",
+              SmartHRTState.DETECTING_LAG: "Détection inertie",
+          }
+          return translations.get(state, str(state))
+  ```
+
+  ```python
+  # const.py
+  SENSOR_DESCRIPTIONS = [
+      SensorEntityDescription(
+          key="recovery_time",
+          name="Temps de récupération",  # ❌ En dur en français
+          native_unit_of_measurement=UnitOfTime.MINUTES,
+      ),
+  ]
+  ```
+
+  **Problèmes identifiés :**
+
+  1. **Pas de support multilingue** : Les utilisateurs non-francophones 
+     voient des libellés en français qu'ils ne comprennent pas.
+
+  2. **Non-conformité Home Assistant** : Les guidelines HA requièrent 
+     l'utilisation des clés de traduction pour toute chaîne visible 
+     dans l'interface.
+
+  3. **Maintenance difficile** : Changer un libellé nécessite de modifier 
+     le code Python et de redéployer l'intégration.
+
+  4. **Incohérence** : Certains sensors utilisent des traductions, 
+     d'autres non, créant une expérience utilisateur incohérente.
+
+  **Standard Home Assistant :**
+
+  Home Assistant fournit un mécanisme de traduction basé sur :
+  - `strings.json` : Définitions par défaut (anglais)
+  - `translations/*.json` : Traductions par langue
+  - `translation_key` : Clé dans le code pour référencer les traductions
+
+decision: |
+  Supprimer toutes les chaînes affichables du code Python et utiliser 
+  exclusivement le système de traduction natif de Home Assistant.
+
+  **1. Structure des fichiers de traduction :**
+
+  ```
+  custom_components/SmartHRT/
+  ├── strings.json              # Définitions par défaut (EN)
+  └── translations/
+      ├── en.json               # Anglais (copie de strings.json)
+      └── fr.json               # Français
+  ```
+
+  **2. Définition des traductions dans `strings.json` :**
+
+  ```json
+  {
+    "config": {
+      "step": {
+        "user": {
+          "title": "Configure SmartHRT",
+          "description": "Set up your heating recovery time calculator",
+          "data": {
+            "interior_sensor": "Interior temperature sensor",
+            "exterior_sensor": "Exterior temperature sensor",
+            "target_temp": "Target temperature"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Cannot connect to sensor",
+        "invalid_sensor": "Invalid sensor entity"
+      }
+    },
+    "entity": {
+      "sensor": {
+        "current_state": {
+          "name": "Heating State",
+          "state": {
+            "initializing": "Initializing",
+            "monitoring": "Monitoring",
+            "recovery": "Recovery in progress",
+            "heating_process": "Heating active",
+            "detecting_lag": "Detecting thermal lag",
+            "unknown": "Unknown"
+          }
+        },
+        "recovery_time": {
+          "name": "Recovery Time"
+        },
+        "recovery_start": {
+          "name": "Recovery Start Time"
+        },
+        "rcth": {
+          "name": "Thermal Coefficient (RCTH)"
+        }
+      }
+    }
+  }
+  ```
+
+  **3. Traduction française (`translations/fr.json`) :**
+
+  ```json
+  {
+    "config": {
+      "step": {
+        "user": {
+          "title": "Configurer SmartHRT",
+          "description": "Configurez votre calculateur de temps de récupération thermique",
+          "data": {
+            "interior_sensor": "Capteur de température intérieure",
+            "exterior_sensor": "Capteur de température extérieure",
+            "target_temp": "Température cible"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Impossible de se connecter au capteur",
+        "invalid_sensor": "Entité de capteur invalide"
+      }
+    },
+    "entity": {
+      "sensor": {
+        "current_state": {
+          "name": "État du chauffage",
+          "state": {
+            "initializing": "Initialisation",
+            "monitoring": "Surveillance",
+            "recovery": "Récupération en cours",
+            "heating_process": "Chauffage actif",
+            "detecting_lag": "Détection de l'inertie",
+            "unknown": "Inconnu"
+          }
+        },
+        "recovery_time": {
+          "name": "Temps de récupération"
+        },
+        "recovery_start": {
+          "name": "Heure de démarrage"
+        },
+        "rcth": {
+          "name": "Coefficient thermique (RCTH)"
+        }
+      }
+    }
+  }
+  ```
+
+  **4. Utilisation dans les entités :**
+
+  ```python
+  # sensor.py
+  class SmartHRTStateSensor(SensorEntity):
+      """Sensor affichant l'état de la machine."""
+      
+      _attr_has_entity_name = True
+      _attr_translation_key = "current_state"  # Référence strings.json
+      _attr_device_class = SensorDeviceClass.ENUM
+      _attr_options = [state.value for state in SmartHRTState]
+      
+      @property
+      def native_value(self) -> str:
+          """Retourne la valeur brute de l'état.
+          
+          Home Assistant traduit automatiquement via translation_key.
+          """
+          return self.coordinator.data.current_state.value
+  ```
+
+  **5. SensorEntityDescription sans `name` :**
+
+  ```python
+  # const.py
+  SENSOR_DESCRIPTIONS = [
+      SensorEntityDescription(
+          key="recovery_time",
+          translation_key="recovery_time",  # ✅ Clé de traduction
+          # name=...  # ❌ NE PAS définir - utilise la traduction
+          native_unit_of_measurement=UnitOfTime.MINUTES,
+          state_class=SensorStateClass.MEASUREMENT,
+      ),
+      SensorEntityDescription(
+          key="rcth",
+          translation_key="rcth",
+          native_unit_of_measurement=UnitOfTime.SECONDS,
+          entity_category=EntityCategory.DIAGNOSTIC,
+      ),
+  ]
+  ```
+
+  **6. Utilisation de `device_class` pour les types standards :**
+
+  ```python
+  # Pour les températures, durées, etc., utiliser device_class
+  # → Home Assistant fournit automatiquement le bon format et unité
+  SensorEntityDescription(
+      key="interior_temp",
+      device_class=SensorDeviceClass.TEMPERATURE,
+      # Pas besoin de translation_key - device_class suffit
+      native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+  ),
+  ```
+
+consequences: |
+  **Positif :**
+
+  - **Conformité totale Home Assistant** : L'intégration respecte les 
+    guidelines officielles et peut être soumise au Core.
+
+  - **Support multilingue immédiat** : Toute langue supportée par Home 
+    Assistant peut être ajoutée sans modification de code Python.
+
+  - **Maintenance simplifiée** : Les traducteurs peuvent modifier les 
+    fichiers JSON sans comprendre le code Python.
+
+  - **Expérience utilisateur cohérente** : Tous les éléments de l'interface 
+    sont dans la langue de l'utilisateur.
+
+  - **Contribution communautaire** : Les utilisateurs peuvent facilement 
+    contribuer des traductions via PR.
+
+  **Négatif :**
+
+  - **Migration initiale** : Nécessite d'identifier toutes les chaînes 
+    en dur et de créer les entrées correspondantes dans strings.json.
+
+  - **Deux fichiers à maintenir** : strings.json et les traductions 
+    doivent rester synchronisés.
+
+  **Bonnes pratiques :**
+
+  - Utiliser `device_class` quand possible (température, humidité, durée) 
+    car Home Assistant fournit déjà les traductions.
+
+  - Pour les sensors ENUM, définir `_attr_options` avec les valeurs brutes 
+    et laisser les traductions dans `state:` du strings.json.
+
+  - Valider les fichiers JSON avec un linter avant commit.
+
+  - Utiliser les clés de traduction standard HA quand elles existent 
+    (ex: `state_attributes` pour les attributs).

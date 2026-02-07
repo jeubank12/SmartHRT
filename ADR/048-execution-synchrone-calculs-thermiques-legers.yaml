@@ -1,0 +1,158 @@
+id: 048
+title: "Exécution Synchrone des Calculs Thermiques Légers"
+status: "Proposé"
+date: "2026-02-07"
+context: |
+  Les calculs thermiques (`calculate_recovery_duration`, `calculate_windchill`, 
+  etc.) sont actuellement exécutés dans un thread pool via 
+  `hass.async_add_executor_job`.
+
+  **Code actuel :**
+
+  ```python
+  # coordinator.py
+  async def _async_compute_recovery_time(self) -> float | None:
+      """Calcule le temps de récupération thermique."""
+      return await self.hass.async_add_executor_job(
+          self.thermal_solver.calculate_recovery_duration,
+          self.data.interior_temp,
+          self.data.exterior_temp,
+          self.data.target_temp,
+          self.data.rcth,
+          self.data.wind_speed,
+      )
+  ```
+
+  **Analyse du problème :**
+
+  1. **Nature des calculs** : Les fonctions de `ThermalSolver` sont purement 
+     mathématiques (opérations arithmétiques, logarithmes, exponentielles). 
+     Elles ne réalisent aucune I/O bloquante.
+
+  2. **Temps d'exécution mesuré** : Benchmarks montrant une exécution 
+     typique < 1ms pour `calculate_recovery_duration`, même avec 100 
+     itérations de convergence.
+
+  3. **Coût du context switch** : L'overhead de `async_add_executor_job` 
+     inclut :
+     - Soumission de la tâche au ThreadPoolExecutor (~10-50µs)
+     - Context switch vers le thread worker (~50-200µs)
+     - Exécution du calcul (~100-500µs)
+     - Context switch retour vers la boucle d'événements (~50-200µs)
+     - Réveil de la coroutine (~10-50µs)
+
+  4. **Ratio coût/bénéfice défavorable** : Le temps de context switch 
+     (200-500µs) peut dépasser le temps du calcul lui-même (~300µs).
+
+  **Règle Home Assistant :**
+
+  La documentation Home Assistant recommande `async_add_executor_job` pour 
+  les opérations bloquantes (I/O, sleep, locks). Les calculs CPU-bound 
+  courts (< 10ms) peuvent rester synchrones pour éviter l'overhead.
+
+decision: |
+  Exécuter les méthodes de `ThermalSolver` directement dans la boucle 
+  d'événements principale (Main Loop) de manière synchrone, tant que les 
+  benchmarks confirment une exécution inférieure à 10ms.
+
+  **1. Suppression des appels `async_add_executor_job` :**
+
+  ```python
+  # Avant
+  async def _async_compute_recovery_time(self) -> float | None:
+      return await self.hass.async_add_executor_job(
+          self.thermal_solver.calculate_recovery_duration,
+          self.data.interior_temp,
+          ...
+      )
+
+  # Après
+  def _compute_recovery_time(self) -> float | None:
+      """Calcule le temps de récupération thermique (synchrone).
+      
+      Note: Exécuté dans la boucle principale car calcul < 10ms.
+      Voir ADR-048 pour la justification.
+      """
+      return self.thermal_solver.calculate_recovery_duration(
+          self.data.interior_temp,
+          ...
+      )
+  ```
+
+  **2. Les fonctions de `ThermalSolver` restent synchrones :**
+
+  ```python
+  # thermal.py - Pas de changement
+  class ThermalSolver:
+      def calculate_recovery_duration(
+          self,
+          interior_temp: float,
+          exterior_temp: float,
+          target_temp: float,
+          rcth: float,
+          wind_speed: float,
+      ) -> float | None:
+          """Calcul synchrone standard (def, pas async def)."""
+          ...
+  ```
+
+  **3. Garantie de non-blocage (garde stricte) :**
+
+  ```python
+  class ThermalSolver:
+      MAX_ITERATIONS: Final = 100  # Limite stricte
+      
+      def calculate_recovery_duration(self, ...) -> float | None:
+          for iteration in range(self.MAX_ITERATIONS):
+              # Convergence logic
+              if abs(delta) < tolerance:
+                  return result
+          
+          # Convergence non atteinte - retourner estimation
+          _LOGGER.warning(
+              "Convergence non atteinte après %d itérations",
+              self.MAX_ITERATIONS,
+          )
+          return result  # Meilleure estimation
+  ```
+
+  **4. Documentation du choix :**
+
+  Ajouter un commentaire explicite dans le code pour expliquer pourquoi 
+  le calcul est synchrone, référençant cet ADR.
+
+consequences: |
+  **Positif :**
+
+  - **Simplification du code asynchrone** : Moins de `await`, code plus 
+    lisible et plus facile à tester (tests synchrones simples).
+
+  - **Réduction de la latence** : Les sensors réagissent plus rapidement 
+    car il n'y a plus d'attente de context switch (~200-500µs économisés 
+    par calcul).
+
+  - **Réduction de l'empreinte mémoire** : Pas de tâches en attente dans 
+    le ThreadPoolExecutor.
+
+  - **Débogage facilité** : Les stack traces sont plus claires sans 
+    l'indirection du thread pool.
+
+  **Négatif :**
+
+  - Aucun identifié pour des calculs < 10ms.
+
+  **Neutre :**
+
+  - **Surveillance requise** : Si les calculs deviennent plus complexes 
+    (ex: modèle multi-zones), il faudra réévaluer et potentiellement 
+    revenir à l'exécution asynchrone.
+
+  - **Limite d'itérations stricte** : La boucle de convergence dans le 
+    solveur DOIT avoir une limite stricte d'itérations (déjà le cas avec 
+    `MAX_ITERATIONS = 100`). Cela garantit que même dans le pire cas, 
+    le calcul ne bloquera pas la boucle d'événements.
+
+  **Critère de réversion :**
+
+  Si les benchmarks montrent un temps d'exécution > 5ms de manière 
+  récurrente, revenir à `async_add_executor_job`.
