@@ -218,7 +218,7 @@ class ThermalSolver:
             duree_relance = max_duration
 
         # ADR-031: Prédiction itérative avec convergence adaptative
-        duree_relance = self._calculate_with_convergence(
+        duree_relance, iterations = self._calculate_with_convergence(
             tint=tint,
             text=text,
             tsp=tsp,
@@ -230,6 +230,16 @@ class ThermalSolver:
         )
 
         recovery_start_hour = target_dt - timedelta(seconds=int(duree_relance * 3600))
+
+        self._logger.info(
+            "Calcul relance: durée=%.2fh, start=%s, iterations=%d (tint=%.1f, text=%.1f, tsp=%.1f)",
+            duree_relance,
+            recovery_start_hour.strftime("%H:%M"),
+            iterations,
+            tint,
+            text,
+            tsp,
+        )
 
         return RecoveryResult(
             recovery_start_hour=recovery_start_hour,
@@ -246,7 +256,7 @@ class ThermalSolver:
         time_remaining: float,
         max_duration: float,
         initial_estimate: float,
-    ) -> float:
+    ) -> tuple[float, int]:
         """Calcul itératif avec critère de convergence (ADR-031).
 
         Args:
@@ -260,13 +270,15 @@ class ThermalSolver:
             initial_estimate: Estimation initiale de la durée
 
         Returns:
-            Durée de relance calculée avec convergence
+            Tuple (durée de relance calculée, nombre d'itérations)
         """
         duree_relance = initial_estimate
         prev_estimate = float("inf")
         converged = False
+        iterations = 0
 
         for iteration in range(self.config.max_iterations):
+            iterations = iteration + 1
             try:
                 # Estimer la température intérieure au moment du démarrage
                 tint_start = text + (tint - text) / math.exp(
@@ -310,7 +322,7 @@ class ThermalSolver:
                 self.config.convergence_threshold,
             )
 
-        return duree_relance
+        return duree_relance, iterations
 
     def calculate_recovery_update_time(
         self,
