@@ -10,6 +10,7 @@ Ces dataclasses représentent:
 
 from dataclasses import dataclass, field
 from datetime import datetime, time as dt_time
+from enum import StrEnum
 
 
 @dataclass
@@ -141,3 +142,25 @@ class CoefficientUpdateResult:
     coef_main: float
     # Erreur observée (pour diagnostic)
     error: float
+
+
+class Action(StrEnum):
+    """Actions emit by the state machine for side effects."""
+
+    SNAPSHOT_RECOVERY_START = "snapshot_recovery_start"
+    SNAPSHOT_RECOVERY_END = "snapshot_recovery_end"
+    CALCULATE_RCTH = "calculate_rcth"
+    CALCULATE_RPTH = "calculate_rpth"
+    SAVE_DATA = "save_data"
+    SCHEDULE_RECOVERY_UPDATE = "schedule_recovery_update"
+    CANCEL_RECOVERY_TIMER = "cancel_recovery_timer"
+
+
+@dataclass
+class StateTransitionResult:
+    """Result for a state transition with emitted actions."""
+
+    success: bool
+    old_state: object
+    new_state: object
+    actions: list[Action] = field(default_factory=list)

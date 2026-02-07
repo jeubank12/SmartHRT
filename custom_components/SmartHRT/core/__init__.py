@@ -9,12 +9,32 @@ Le code est organisé en:
 Aucune dépendance à Home Assistant dans ce module.
 """
 
-from .types import ThermalState, ThermalCoefficients, ThermalConfig
+from .types import (
+    ThermalState,
+    ThermalCoefficients,
+    ThermalConfig,
+    Action,
+    StateTransitionResult,
+)
 from .thermal import ThermalSolver
+from .state_machine import (
+    SmartHRTState,
+    SmartHRTStateMachine,
+    VALID_TRANSITIONS,
+    STATE_FLAGS,
+    get_state_flags,
+)
 
 __all__ = [
     "ThermalState",
     "ThermalCoefficients",
     "ThermalConfig",
     "ThermalSolver",
+    "Action",
+    "StateTransitionResult",
+    "SmartHRTState",
+    "SmartHRTStateMachine",
+    "VALID_TRANSITIONS",
+    "STATE_FLAGS",
+    "get_state_flags",
 ]

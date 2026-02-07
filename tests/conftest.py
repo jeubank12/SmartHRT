@@ -223,6 +223,7 @@ def create_coordinator(mock_hass, mock_entry, mock_store):
 
             # Configurer les données initiales
             coordinator.data.current_state = initial_state
+            coordinator._state_machine.force_state(initial_state, run_callbacks=False)
             coordinator.data.interior_temp = 18.5
             coordinator.data.exterior_temp = 5.0
             coordinator.data.wind_speed = 4.0

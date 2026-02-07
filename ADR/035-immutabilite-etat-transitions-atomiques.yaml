@@ -124,8 +124,8 @@ consequences:
     - Overhead mémoire léger (création de nouveaux objets)
     - Nécessite de repenser les mutations existantes
   risks:
-    - Performance : la création d'objets à chaque transition doit être mesurée
-    - Migration : le code existant utilise des mutations directes partout
+    - Performance: la création d'objets à chaque transition doit être mesurée
+    - Migration: le code existant utilise des mutations directes partout
 
 implementation_notes: |
   - Ajouter `frozen=True` progressivement aux dataclasses d'état

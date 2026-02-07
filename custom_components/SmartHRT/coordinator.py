@@ -22,14 +22,17 @@ ADR implémentées dans ce module:
 - ADR-026: Extraction modèle thermique (core.ThermalSolver, core.ThermalState)
 - ADR-027: Héritage DataUpdateCoordinator (notifications automatiques, CoordinatorEntity)
 - ADR-028: Modernisation StrEnum pour machine à états (SmartHRTState, VALID_TRANSITIONS)
+- ADR-033: Découplage logique état (SmartHRTStateMachine)
+- ADR-034: Gestion centralisée effets de bord (Action handlers)
+- ADR-035: Immuabilité état (transitions atomiques)
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, time as dt_time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 from collections import deque
-from enum import StrEnum
 
 from homeassistant.core import HomeAssistant, callback, Event
 from homeassistant.config_entries import ConfigEntry
@@ -69,42 +72,20 @@ from .const import (
 )
 
 # ADR-026: Import du modèle thermique Pure Python
-from .core import ThermalSolver, ThermalState, ThermalCoefficients, ThermalConfig
+from .core import (
+    ThermalSolver,
+    ThermalState,
+    ThermalCoefficients,
+    ThermalConfig,
+    Action,
+    StateTransitionResult,
+    SmartHRTState,
+    SmartHRTStateMachine,
+    VALID_TRANSITIONS,
+    get_state_flags,
+)
 
 _LOGGER = logging.getLogger(__name__)
-
-
-# ADR-003 & ADR-028: Machine à états explicite avec StrEnum
-# Les 5 états modélisent le cycle thermique journalier complet
-class SmartHRTState(StrEnum):
-    """États de la machine à états SmartHRT (ADR-003, ADR-028).
-
-    Cycle de vie:
-    HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESS → HEATING_ON
-
-    StrEnum permet:
-    - Compatibilité JSON native (SmartHRTState.HEATING_ON == "heating_on")
-    - Validation automatique à l'assignation
-    - Itération sur les états: list(SmartHRTState)
-    - Meilleur support IDE et mypy
-    """
-
-    HEATING_ON = "heating_on"  # État 1: Journée, chauffage actif
-    DETECTING_LAG = "detecting_lag"  # État 2: Attente baisse de température (-0.2°C)
-    MONITORING = "monitoring"  # État 3: Surveillance nocturne, calculs récurrents
-    RECOVERY = "recovery"  # État 4: Moment de la relance, calcul RCth
-    HEATING_PROCESS = "heating_process"  # État 5: Montée en température, calcul RPth
-
-
-# ADR-028: Table des transitions valides entre états
-# Définit explicitement les transitions autorisées pour la machine à états
-VALID_TRANSITIONS: dict[SmartHRTState, set[SmartHRTState]] = {
-    SmartHRTState.HEATING_ON: {SmartHRTState.DETECTING_LAG},
-    SmartHRTState.DETECTING_LAG: {SmartHRTState.MONITORING},
-    SmartHRTState.MONITORING: {SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS},
-    SmartHRTState.RECOVERY: {SmartHRTState.HEATING_PROCESS},
-    SmartHRTState.HEATING_PROCESS: {SmartHRTState.HEATING_ON},
-}
 
 
 @dataclass
@@ -225,6 +206,38 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
             ),
         )
 
+        # ADR-033/034: Machine à états avec actions configurées
+        transition_actions = {
+            (SmartHRTState.MONITORING, SmartHRTState.RECOVERY): [
+                Action.CANCEL_RECOVERY_TIMER,
+                Action.SNAPSHOT_RECOVERY_START,
+                Action.CALCULATE_RCTH,
+                Action.SAVE_DATA,
+            ],
+            (SmartHRTState.HEATING_PROCESS, SmartHRTState.HEATING_ON): [
+                Action.SNAPSHOT_RECOVERY_END,
+                Action.CALCULATE_RPTH,
+                Action.SAVE_DATA,
+            ],
+        }
+
+        log_prefix = f"[{self.data.name}#{entry.entry_id[:8]}]"
+        self._state_machine = SmartHRTStateMachine(
+            self.data.current_state,
+            transition_actions=transition_actions,
+            logger=_LOGGER,
+            log_prefix=log_prefix,
+        )
+        self._state_machine.on_enter(SmartHRTState.HEATING_ON, self._on_state_entered)
+        self._state_machine.on_enter(
+            SmartHRTState.DETECTING_LAG, self._on_state_entered
+        )
+        self._state_machine.on_enter(SmartHRTState.MONITORING, self._on_state_entered)
+        self._state_machine.on_enter(SmartHRTState.RECOVERY, self._on_state_entered)
+        self._state_machine.on_enter(
+            SmartHRTState.HEATING_PROCESS, self._on_state_entered
+        )
+
         self._interior_temp_sensor_id = entry.data.get(CONF_SENSOR_INTERIOR_TEMP)
         # ADR-002: Entité météo sélectionnée explicitement par l'utilisateur
         self._weather_entity_id = entry.data.get(CONF_WEATHER_ENTITY)
@@ -247,29 +260,24 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         """
         return f"[{self.data.name}#{self._entry.entry_id[:8]}]"
 
+    def _on_state_entered(
+        self, _old_state: SmartHRTState, new_state: SmartHRTState
+    ) -> None:
+        """Synchronise l'état exposé avec la machine à états."""
+        self.data.current_state = new_state
+
     def transition_to(self, new_state: SmartHRTState) -> bool:
-        """Effectue une transition d'état si elle est valide (ADR-028).
-
-        Vérifie que la transition est autorisée selon VALID_TRANSITIONS
-        avant de changer l'état. Log un warning si la transition est invalide.
-
-        Args:
-            new_state: Le nouvel état cible (SmartHRTState)
-
-        Returns:
-            True si la transition a été effectuée, False sinon
-        """
-        current = self.data.current_state
+        """Effectue une transition d'état si elle est valide (ADR-028)."""
+        current = self._state_machine.state
         valid_targets = VALID_TRANSITIONS.get(current, set())
 
-        if new_state in valid_targets:
+        if self._state_machine.transition_to(new_state):
             _LOGGER.info(
                 "%s Transition %s → %s",
                 self._log_prefix(),
                 current.value,
                 new_state.value,
             )
-            self.data.current_state = new_state
             return True
 
         _LOGGER.warning(
@@ -281,17 +289,153 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         )
         return False
 
-    def force_state(self, new_state: SmartHRTState) -> None:
-        """Force un changement d'état sans validation (ADR-028).
+    def _apply_state_transition_with_actions(
+        self,
+        new_state: SmartHRTState,
+        updates: dict[str, object] | None = None,
+        omit_actions: set[Action] | None = None,
+    ) -> list[Action] | None:
+        current = self._state_machine.state
+        valid_targets = VALID_TRANSITIONS.get(current, set())
+        if not self._state_machine.can_transition(current, new_state):
+            _LOGGER.warning(
+                "%s Transition invalide %s → %s (autorisées: %s)",
+                self._log_prefix(),
+                current.value,
+                new_state.value,
+                (
+                    ", ".join(s.value for s in valid_targets)
+                    if valid_targets
+                    else "aucune"
+                ),
+            )
+            return None
 
-        À utiliser uniquement pour la restauration d'état ou les services
-        administratifs. Log l'action pour traçabilité.
+        flags = get_state_flags(new_state)
+        merged_updates = {**flags, **(updates or {})}
+        self.data = replace(self.data, current_state=new_state, **merged_updates)
+        self._state_machine.force_state(new_state, run_callbacks=False)
 
-        Args:
-            new_state: Le nouvel état à forcer (SmartHRTState)
+        actions = self._state_machine.actions_for_transition(current, new_state)
+        if omit_actions:
+            actions = [action for action in actions if action not in omit_actions]
+        return actions
+
+    def transition_with_actions(
+        self, new_state: SmartHRTState
+    ) -> StateTransitionResult:
+        """Effectue une transition et retourne les actions à exécuter (ADR-034)."""
+        current = self._state_machine.state
+        valid_targets = VALID_TRANSITIONS.get(current, set())
+        result = self._state_machine.transition_with_actions(new_state)
+
+        if result.success:
+            _LOGGER.info(
+                "%s Transition %s → %s",
+                self._log_prefix(),
+                current.value,
+                new_state.value,
+            )
+            return result
+
+        _LOGGER.warning(
+            "%s Transition invalide %s → %s (autorisées: %s)",
+            self._log_prefix(),
+            current.value,
+            new_state.value,
+            ", ".join(s.value for s in valid_targets) if valid_targets else "aucune",
+        )
+        return result
+
+    def _execute_actions(self, actions: list[Action]) -> None:
+        """Exécute les actions émises par la machine à états (ADR-034).
+
+        Gère les handlers sync et async avec logging et gestion d'erreurs.
         """
-        old_state = self.data.current_state
-        self.data.current_state = new_state
+        if not actions:
+            return
+
+        action_handlers = {
+            Action.SNAPSHOT_RECOVERY_START: self._snapshot_recovery_start,
+            Action.SNAPSHOT_RECOVERY_END: self._snapshot_recovery_end,
+            Action.CALCULATE_RCTH: self._calculate_rcth_at_recovery_start,
+            Action.CALCULATE_RPTH: self._calculate_rpth_at_recovery_end,
+            Action.SAVE_DATA: self._save_learned_data,
+            Action.SCHEDULE_RECOVERY_UPDATE: self._schedule_recovery_update_from_data,
+            Action.CANCEL_RECOVERY_TIMER: self._cancel_recovery_start_timer,
+        }
+
+        _LOGGER.debug(
+            "%s Exécution actions: %s",
+            self._log_prefix(),
+            [a.value for a in actions],
+        )
+
+        for action in actions:
+            handler = action_handlers.get(action)
+            if not handler:
+                _LOGGER.warning(
+                    "%s Action non gérée: %s", self._log_prefix(), action.value
+                )
+                continue
+            try:
+                result = handler()
+                if asyncio.iscoroutine(result):
+                    self.hass.async_create_task(result)
+            except Exception as e:
+                _LOGGER.error(
+                    "%s Erreur lors de l'action %s: %s",
+                    self._log_prefix(),
+                    action.value,
+                    e,
+                )
+
+    def _cancel_recovery_start_timer(self) -> None:
+        """Annule le trigger de recovery_start si présent."""
+        if self._unsub_recovery_start:
+            self._unsub_recovery_start()
+            self._unsub_recovery_start = None
+
+    def _snapshot_recovery_start(self) -> None:
+        """Snapshot des données au démarrage de relance."""
+        self.data.time_recovery_start = dt_util.now()
+        self.data.temp_recovery_start = self.data.interior_temp or 17.0
+        self.data.text_recovery_start = self.data.exterior_temp or 0.0
+
+    def _snapshot_recovery_end(self) -> None:
+        """Snapshot des données à la fin de relance."""
+        self.data.time_recovery_end = dt_util.now()
+        self.data.temp_recovery_end = self.data.interior_temp or 17.0
+        self.data.text_recovery_end = self.data.exterior_temp or 0.0
+
+    def _calculate_rcth_at_recovery_start(self) -> None:
+        """Calcule RCth au démarrage de relance."""
+        self.calculate_rcth_at_recovery_start()
+
+    def _calculate_rpth_at_recovery_end(self) -> None:
+        """Calcule RPth à la fin de relance."""
+        self.calculate_rpth_at_recovery_end()
+
+    def _schedule_recovery_update_from_data(self) -> None:
+        """Programme la mise à jour de relance si une heure est connue."""
+        if self.data.recovery_update_hour:
+            self._schedule_recovery_update(self.data.recovery_update_hour)
+
+    def force_state(self, new_state: SmartHRTState) -> None:
+        """Force un changement d'état sans validation (ADR-028, ADR-035).
+
+        Met à jour atomiquement l'état et les flags associés.
+        À utiliser avec parcimonie (restauration, services admin).
+        """
+        old_state = self._state_machine.state
+        if new_state == old_state:
+            return
+
+        # ADR-035: Mise à jour atomique avec flags cohérents
+        flags = get_state_flags(new_state)
+        self.data = replace(self.data, current_state=new_state, **flags)
+        self._state_machine.force_state(new_state, run_callbacks=False)
+
         _LOGGER.info(
             "%s État forcé %s → %s",
             self._log_prefix(),
@@ -481,6 +625,8 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                 "%s Aucune donnée apprise trouvée, utilisation des défauts",
                 self._log_prefix(),
             )
+
+        self._state_machine.force_state(self.data.current_state)
 
     async def _save_learned_data(self) -> None:
         """Save learned coefficients and state to persistent storage.
@@ -725,7 +871,8 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
         # Transition vers DETECTING_LAG (État 2)
         # On attend la baisse de température de 0.2°C avant de lancer les calculs
-        self.data.current_state = SmartHRTState.DETECTING_LAG
+        if not self.transition_to(SmartHRTState.DETECTING_LAG):
+            self.force_state(SmartHRTState.DETECTING_LAG)
         self.data.temp_lag_detection_active = True
         _LOGGER.debug("%s Transition vers état DETECTING_LAG", self._log_prefix())
 
@@ -1334,7 +1481,8 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         self.data.time_recovery_calc = now
 
         # Transition vers MONITORING (État 3)
-        self.data.current_state = SmartHRTState.MONITORING
+        if not self.transition_to(SmartHRTState.MONITORING):
+            self.force_state(SmartHRTState.MONITORING)
         self.data.recovery_calc_mode = True
         self.data.temp_lag_detection_active = False
         _LOGGER.debug("%s Transition vers état MONITORING", self._log_prefix())
@@ -1362,7 +1510,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
     # ADR-019: Restauration état après redémarrage
     # ─────────────────────────────────────────────────────────────────────────
 
-    def _determine_expected_state_for_time(self, now: datetime) -> str:
+    def _determine_expected_state_for_time(self, now: datetime) -> SmartHRTState:
         """Détermine l'état attendu de la machine à états basé sur l'heure actuelle.
 
         Cette méthode analyse l'heure actuelle par rapport aux heures configurées
@@ -1481,7 +1629,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
         elif current_state == SmartHRTState.RECOVERY:
             # Transition vers HEATING_PROCESS
-            self.data.current_state = SmartHRTState.HEATING_PROCESS
+            self.force_state(SmartHRTState.HEATING_PROCESS)
             self.data.rp_calc_mode = True
             await self._save_learned_data()
 
@@ -1500,75 +1648,49 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         self.async_set_updated_data(self.data)
 
     async def _transition_to_expected_state(
-        self, expected_state: str, now: datetime
+        self, expected_state: SmartHRTState, now: datetime
     ) -> None:
-        """Transition vers l'état attendu après détection d'incohérence.
+        """Transition vers l'état attendu après détection d'incohérence (ADR-035).
 
-        Args:
-            expected_state: L'état vers lequel transitionner (SmartHRTState.*)
-            now: L'heure actuelle
+        Utilise des mises à jour atomiques via replace() pour garantir la cohérence.
         """
         _LOGGER.info(
-            "%s Transition forcée vers l'état %s",
+            "%s Correction état incohérent → %s",
             self._log_prefix(),
-            expected_state,
+            expected_state.value,
         )
 
-        if expected_state == SmartHRTState.HEATING_ON:
-            self.data.current_state = SmartHRTState.HEATING_ON
-            self.data.recovery_calc_mode = False
-            self.data.rp_calc_mode = False
-            self.data.temp_lag_detection_active = False
+        # ADR-035: Mise à jour atomique avec flags cohérents
+        flags = get_state_flags(expected_state)
+        updates: dict[str, object] = {**flags}
 
-        elif expected_state == SmartHRTState.MONITORING:
-            self.data.current_state = SmartHRTState.MONITORING
-            self.data.recovery_calc_mode = True
-            self.data.rp_calc_mode = False
-            self.data.temp_lag_detection_active = False
-
-            # Initialiser les valeurs de référence si non définies
-            if (
-                self.data.temp_recovery_calc is None
-                or self.data.temp_recovery_calc == 0
-            ):
-                self.data.temp_recovery_calc = self.data.interior_temp or 17.0
+        # Ajouter les initialisations spécifiques à l'état
+        if expected_state == SmartHRTState.MONITORING:
+            if not self.data.temp_recovery_calc or self.data.temp_recovery_calc == 0:
+                updates["temp_recovery_calc"] = self.data.interior_temp or 17.0
             if self.data.text_recovery_calc is None:
-                self.data.text_recovery_calc = self.data.exterior_temp or 0.0
+                updates["text_recovery_calc"] = self.data.exterior_temp or 0.0
+        elif expected_state == SmartHRTState.HEATING_PROCESS:
+            if self.data.time_recovery_start is None:
+                updates["time_recovery_start"] = self.data.recovery_start_hour or now
+            if not self.data.temp_recovery_start or self.data.temp_recovery_start == 0:
+                updates["temp_recovery_start"] = self.data.interior_temp or 17.0
+            if self.data.text_recovery_start is None:
+                updates["text_recovery_start"] = self.data.exterior_temp or 0.0
+        elif expected_state == SmartHRTState.DETECTING_LAG:
+            updates["temp_recovery_calc"] = self.data.interior_temp or 17.0
+            updates["text_recovery_calc"] = self.data.exterior_temp or 0.0
+            updates["time_recovery_calc"] = now
 
-            # Programmer les triggers
+        # Application atomique
+        self.data = replace(self.data, current_state=expected_state, **updates)
+        self._state_machine.force_state(expected_state, run_callbacks=False)
+
+        # Reprogrammer les triggers si nécessaire
+        if expected_state == SmartHRTState.MONITORING:
             if self.data.recovery_start_hour and self.data.recovery_start_hour > now:
                 self._schedule_recovery_start(self.data.recovery_start_hour)
 
-        elif expected_state == SmartHRTState.HEATING_PROCESS:
-            self.data.current_state = SmartHRTState.HEATING_PROCESS
-            self.data.recovery_calc_mode = False
-            self.data.rp_calc_mode = True
-            self.data.temp_lag_detection_active = False
-
-            # Initialiser les valeurs de début de relance si non définies
-            if self.data.time_recovery_start is None:
-                if self.data.recovery_start_hour:
-                    self.data.time_recovery_start = self.data.recovery_start_hour
-                else:
-                    self.data.time_recovery_start = now
-            if (
-                self.data.temp_recovery_start is None
-                or self.data.temp_recovery_start == 0
-            ):
-                self.data.temp_recovery_start = self.data.interior_temp or 17.0
-            if self.data.text_recovery_start is None:
-                self.data.text_recovery_start = self.data.exterior_temp or 0.0
-
-        elif expected_state == SmartHRTState.DETECTING_LAG:
-            self.data.current_state = SmartHRTState.DETECTING_LAG
-            self.data.recovery_calc_mode = False
-            self.data.rp_calc_mode = False
-            self.data.temp_lag_detection_active = True
-            self.data.temp_recovery_calc = self.data.interior_temp or 17.0
-            self.data.text_recovery_calc = self.data.exterior_temp or 0.0
-            self.data.time_recovery_calc = now
-
-        # Sauvegarder le nouvel état
         await self._save_learned_data()
         self.async_set_updated_data(self.data)
 
@@ -1598,28 +1720,39 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
         Transition: MONITORING → RECOVERY → HEATING_PROCESS (État 3 → État 4 → État 5)
         """
-        # Annuler le trigger de recovery_start pour éviter les redéclenchements
-        if self._unsub_recovery_start:
-            self._unsub_recovery_start()
-            self._unsub_recovery_start = None
-
         # Transition vers RECOVERY (État 4)
-        self.data.current_state = SmartHRTState.RECOVERY
+        now = dt_util.now()
+        updates = {
+            "time_recovery_start": now,
+            "temp_recovery_start": self.data.interior_temp or 17.0,
+            "text_recovery_start": self.data.exterior_temp or 0.0,
+        }
+        actions = self._apply_state_transition_with_actions(
+            SmartHRTState.RECOVERY,
+            updates=updates,
+            omit_actions={Action.SNAPSHOT_RECOVERY_START},
+        )
+        if actions is None:
+            self.data = replace(self.data, **updates)
+            self.force_state(SmartHRTState.RECOVERY)
+            actions = [
+                Action.CANCEL_RECOVERY_TIMER,
+                Action.CALCULATE_RCTH,
+                Action.SAVE_DATA,
+            ]
         _LOGGER.debug("%s Transition vers état RECOVERY", self._log_prefix())
 
-        self.data.time_recovery_start = dt_util.now()
-        self.data.temp_recovery_start = self.data.interior_temp or 17.0
-        self.data.text_recovery_start = self.data.exterior_temp or 0.0
-
-        self.calculate_rcth_at_recovery_start()
-
-        self.data.rp_calc_mode = True
-        self.data.recovery_calc_mode = False
-        self.data.temp_lag_detection_active = False
+        pre_actions = [action for action in actions if action != Action.SAVE_DATA]
+        if pre_actions:
+            self._execute_actions(pre_actions)
 
         # Transition vers HEATING_PROCESS (État 5) - chauffage en cours
-        self.data.current_state = SmartHRTState.HEATING_PROCESS
+        if not self.transition_to(SmartHRTState.HEATING_PROCESS):
+            self.force_state(SmartHRTState.HEATING_PROCESS)
         _LOGGER.debug("%s Transition vers état HEATING_PROCESS", self._log_prefix())
+
+        if Action.SAVE_DATA in actions:
+            self._execute_actions([Action.SAVE_DATA])
 
         _LOGGER.info(
             "%s Début de relance - Tint=%.1f°C, RCth calculé=%.2f",
@@ -1627,9 +1760,6 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
             self.data.temp_recovery_start,
             self.data.rcth_calculated,
         )
-
-        # Sauvegarder l'état après la transition
-        self.hass.async_create_task(self._save_learned_data())
 
         self.async_set_updated_data(self.data)
 
@@ -1642,19 +1772,36 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         if not self.data.rp_calc_mode:
             return
 
-        self.data.time_recovery_end = dt_util.now()
-        self.data.temp_recovery_end = self.data.interior_temp or 17.0
-        self.data.text_recovery_end = self.data.exterior_temp or 0.0
-
-        self.calculate_rpth_at_recovery_end()
-
-        self.data.rp_calc_mode = False
-
+        pre_actions = []
         # Transition vers HEATING_ON (État 1) - cycle terminé
-        self.data.current_state = SmartHRTState.HEATING_ON
+        now = dt_util.now()
+        updates = {
+            "time_recovery_end": now,
+            "temp_recovery_end": self.data.interior_temp or 17.0,
+            "text_recovery_end": self.data.exterior_temp or 0.0,
+        }
+        actions = self._apply_state_transition_with_actions(
+            SmartHRTState.HEATING_ON,
+            updates=updates,
+            omit_actions={Action.SNAPSHOT_RECOVERY_END},
+        )
+        if actions is None:
+            self.data = replace(self.data, **updates)
+            self.force_state(SmartHRTState.HEATING_ON)
+            actions = [
+                Action.CALCULATE_RPTH,
+                Action.SAVE_DATA,
+            ]
         _LOGGER.debug(
             "%s Transition vers état HEATING_ON - Cycle terminé", self._log_prefix()
         )
+
+        pre_actions = [action for action in actions if action != Action.SAVE_DATA]
+        if pre_actions:
+            self._execute_actions(pre_actions)
+
+        if Action.SAVE_DATA in actions:
+            self._execute_actions([Action.SAVE_DATA])
 
         _LOGGER.info(
             "%s Fin de relance - Tint=%.1f°C, RPth calculé=%.2f",
@@ -1662,9 +1809,6 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
             self.data.temp_recovery_end,
             self.data.rpth_calculated,
         )
-
-        # Sauvegarder l'état après la transition (coefficients mis à jour)
-        self.hass.async_create_task(self._save_learned_data())
 
         self.async_set_updated_data(self.data)
 
