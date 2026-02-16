@@ -132,6 +132,8 @@ actions:
           - condition: trigger
             id: fin_cycle
         sequence:
+          - delay:
+              seconds: 10
           - if:
               - condition: time
                 before: "12:00:00"
