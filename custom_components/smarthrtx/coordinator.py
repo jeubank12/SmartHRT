@@ -66,6 +66,8 @@ from .const import (
     CONF_RECOVERYCALC_HOUR,
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
+    CONF_SENSOR_OUTDOOR_TEMP,
+    CONF_SENSOR_WIND_SPEED,
     CONF_TSP,
     DEFAULT_TSP,
     DEFAULT_RCTH,
@@ -173,6 +175,9 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         self._interior_temp_sensor_id = entry.data.get(CONF_SENSOR_INTERIOR_TEMP)
         # ADR-002: Entité météo sélectionnée explicitement par l'utilisateur
         self._weather_entity_id = entry.data.get(CONF_WEATHER_ENTITY)
+        # Optional individual sensor overrides for current conditions
+        self._outdoor_temp_sensor_id: str | None = entry.data.get(CONF_SENSOR_OUTDOOR_TEMP) or None
+        self._wind_speed_sensor_id: str | None = entry.data.get(CONF_SENSOR_WIND_SPEED) or None
 
         # ADR-026: Initialisation du solveur thermique Pure Python
         thermal_config = ThermalConfig(
@@ -555,7 +560,13 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         - Listener sur l'entité météo (remplace le polling minute)
         - Mise à jour horaire des prévisions météo
         """
-        sensors = [s for s in [self._interior_temp_sensor_id] if s]
+        sensors = [
+            s for s in [
+                self._interior_temp_sensor_id,
+                self._outdoor_temp_sensor_id,
+                self._wind_speed_sensor_id,
+            ] if s
+        ]
 
         if sensors:
             self._unsub_listeners.append(
@@ -695,11 +706,49 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                 except ValueError:
                     pass
 
+        # Weather entity provides current conditions (skips fields with sensor overrides)
         self._update_weather_data()
+
+        # Override exterior_temp / wind_speed with individual sensors if configured
+        if self._outdoor_temp_sensor_id:
+            state = self.hass.states.get(self._outdoor_temp_sensor_id)
+            if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                try:
+                    temp_val = float(state.state)
+                    unit = state.attributes.get("unit_of_measurement", "")
+                    if unit == UnitOfTemperature.FAHRENHEIT:
+                        temp_val = (temp_val - 32) * 5 / 9
+                    self.data.exterior_temp = temp_val
+                except ValueError:
+                    pass
+
+        if self._wind_speed_sensor_id:
+            state = self.hass.states.get(self._wind_speed_sensor_id)
+            if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                try:
+                    wind_val = float(state.state)
+                    wind_unit = state.attributes.get(
+                        "unit_of_measurement", UnitOfSpeed.METERS_PER_SECOND
+                    )
+                    self.data.wind_speed = self._normalize_wind_to_ms(wind_val, wind_unit)
+                    self.data.wind_speed_history.append(self.data.wind_speed)
+                except ValueError:
+                    pass
+
+    @staticmethod
+    def _normalize_wind_to_ms(wind_val: float, wind_unit: str) -> float:
+        """Convert wind speed from any supported unit to m/s."""
+        if wind_unit == UnitOfSpeed.KILOMETERS_PER_HOUR:
+            return wind_val / 3.6
+        if wind_unit == UnitOfSpeed.MILES_PER_HOUR:
+            return wind_val * 0.44704
+        if wind_unit == UnitOfSpeed.KNOTS:
+            return wind_val * 0.514444
+        return wind_val  # Already m/s
 
     @callback
     def _on_sensor_state_change(self, event) -> None:
-        """Callback when the temperature sensor state changes."""
+        """Callback when a tracked sensor state changes."""
         new_state = event.data.get("new_state")
         if not new_state or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             return
@@ -714,6 +763,30 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                     raw_temp = (raw_temp - 32) * 5 / 9
                 self.data.interior_temp = raw_temp
                 self._check_temperature_thresholds()
+            except ValueError:
+                pass
+
+        elif entity_id == self._outdoor_temp_sensor_id:
+            try:
+                temp_val = float(new_state.state)
+                unit = new_state.attributes.get("unit_of_measurement", "")
+                if unit == UnitOfTemperature.FAHRENHEIT:
+                    temp_val = (temp_val - 32) * 5 / 9
+                self.data.exterior_temp = temp_val
+                self._calculate_windchill()
+            except ValueError:
+                pass
+
+        elif entity_id == self._wind_speed_sensor_id:
+            try:
+                wind_val = float(new_state.state)
+                wind_unit = new_state.attributes.get(
+                    "unit_of_measurement", UnitOfSpeed.METERS_PER_SECOND
+                )
+                self.data.wind_speed = self._normalize_wind_to_ms(wind_val, wind_unit)
+                self.data.wind_speed_history.append(self.data.wind_speed)
+                self._update_wind_speed_average()
+                self._calculate_windchill()
             except ValueError:
                 pass
 
@@ -1007,27 +1080,24 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
             )
             return
 
-        if (temp := weather.attributes.get("temperature")) is not None:
-            temp_val = float(temp)
-            temp_unit = weather.attributes.get("temperature_unit", "")
-            if temp_unit == UnitOfTemperature.FAHRENHEIT:
-                temp_val = (temp_val - 32) * 5 / 9
-            self.data.exterior_temp = temp_val
+        # Only update exterior_temp from weather entity if no individual sensor overrides it
+        if self._outdoor_temp_sensor_id is None:
+            if (temp := weather.attributes.get("temperature")) is not None:
+                temp_val = float(temp)
+                temp_unit = weather.attributes.get("temperature_unit", "")
+                if temp_unit == UnitOfTemperature.FAHRENHEIT:
+                    temp_val = (temp_val - 32) * 5 / 9
+                self.data.exterior_temp = temp_val
 
-        if (wind := weather.attributes.get("wind_speed")) is not None:
-            wind_val = float(wind)
-            wind_unit = weather.attributes.get("wind_speed_unit", UnitOfSpeed.KILOMETERS_PER_HOUR)
-            # Normalize all wind speeds to m/s for internal calculations
-            if wind_unit == UnitOfSpeed.KILOMETERS_PER_HOUR:
-                wind_val = wind_val / 3.6
-            elif wind_unit == UnitOfSpeed.MILES_PER_HOUR:
-                wind_val = wind_val * 0.44704
-            elif wind_unit == UnitOfSpeed.KNOTS:
-                wind_val = wind_val * 0.514444
-            # UnitOfSpeed.METERS_PER_SECOND: no conversion needed
-            self.data.wind_speed = wind_val
-            # Add to history for average calculation
-            self.data.wind_speed_history.append(self.data.wind_speed)
+        # Only update wind_speed from weather entity if no individual sensor overrides it
+        if self._wind_speed_sensor_id is None:
+            if (wind := weather.attributes.get("wind_speed")) is not None:
+                wind_val = float(wind)
+                wind_unit = weather.attributes.get(
+                    "wind_speed_unit", UnitOfSpeed.KILOMETERS_PER_HOUR
+                )
+                self.data.wind_speed = self._normalize_wind_to_ms(wind_val, wind_unit)
+                self.data.wind_speed_history.append(self.data.wind_speed)
 
         self._calculate_windchill()
 

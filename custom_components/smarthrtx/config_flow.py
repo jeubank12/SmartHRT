@@ -28,6 +28,8 @@ from .const import (
     CONF_RECOVERYCALC_HOUR,
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
+    CONF_SENSOR_OUTDOOR_TEMP,
+    CONF_SENSOR_WIND_SPEED,
     CONF_TSP,
     CONF_TEMP_UNIT,
     TEMP_UNIT_CELSIUS,
@@ -196,6 +198,13 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather"),
                 ),
+                # Optional sensor overrides for current conditions
+                vol.Optional(CONF_SENSOR_OUTDOOR_TEMP): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN),
+                ),
+                vol.Optional(CONF_SENSOR_WIND_SPEED): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN),
+                ),
                 # Temperature unit preference for Set Point input
                 vol.Required(
                     CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
@@ -248,6 +257,15 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
             temp_state = self.hass.states.get(temp_sensor_id)
             if temp_state is None:
                 errors[CONF_SENSOR_INTERIOR_TEMP] = "sensor_not_found"
+
+        # Validate optional sensor overrides (if provided)
+        outdoor_temp_sensor = user_input.get(CONF_SENSOR_OUTDOOR_TEMP)
+        if outdoor_temp_sensor and self.hass.states.get(outdoor_temp_sensor) is None:
+            errors[CONF_SENSOR_OUTDOOR_TEMP] = "sensor_not_found"
+
+        wind_sensor = user_input.get(CONF_SENSOR_WIND_SPEED)
+        if wind_sensor and self.hass.states.get(wind_sensor) is None:
+            errors[CONF_SENSOR_WIND_SPEED] = "sensor_not_found"
 
         # ADR-032: Validate Set Point (always checked in Celsius)
         if not (DEFAULT_TSP_MIN <= tsp_celsius <= DEFAULT_TSP_MAX):
@@ -340,6 +358,8 @@ STATIC_KEYS = {
     CONF_NAME,
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
+    CONF_SENSOR_OUTDOOR_TEMP,
+    CONF_SENSOR_WIND_SPEED,
 }
 # Keys stored in 'options' (dynamic settings - modifiable without reload)
 DYNAMIC_KEYS = {CONF_TARGET_HOUR, CONF_RECOVERYCALC_HOUR, CONF_TSP, CONF_TEMP_UNIT}
@@ -388,6 +408,13 @@ class SmartHRTOptionsFlow(OptionsFlow):
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather")
                 ),
+                # Optional sensor overrides for current conditions
+                vol.Optional(CONF_SENSOR_OUTDOOR_TEMP): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN)
+                ),
+                vol.Optional(CONF_SENSOR_WIND_SPEED): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN)
+                ),
                 # Temperature unit preference for Set Point input
                 vol.Required(
                     CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
@@ -431,6 +458,14 @@ class SmartHRTOptionsFlow(OptionsFlow):
             errors[CONF_TSP] = (
                 "tsp_out_of_range_f" if temp_unit == TEMP_UNIT_FAHRENHEIT else "tsp_out_of_range"
             )
+
+        outdoor_temp_sensor = user_input.get(CONF_SENSOR_OUTDOOR_TEMP)
+        if outdoor_temp_sensor and self.hass.states.get(outdoor_temp_sensor) is None:
+            errors[CONF_SENSOR_OUTDOOR_TEMP] = "sensor_not_found"
+
+        wind_sensor = user_input.get(CONF_SENSOR_WIND_SPEED)
+        if wind_sensor and self.hass.states.get(wind_sensor) is None:
+            errors[CONF_SENSOR_WIND_SPEED] = "sensor_not_found"
 
         if errors:
             _LOGGER.debug("Options flow validation errors: %s", errors)

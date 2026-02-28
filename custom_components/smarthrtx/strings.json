@@ -20,14 +20,18 @@
           "target_hour": "Target hour",
           "recoverycalc_hour": "Heating stop hour",
           "sensor_interior_temperature": "Interior temperature sensor",
-          "weather_entity": "Weather source (outdoor temperature)",
+          "weather_entity": "Weather source (forecasts + fallback conditions)",
+          "sensor_outdoor_temperature": "Outdoor temperature sensor (optional override)",
+          "sensor_wind_speed": "Wind speed sensor (optional override)",
           "tsp": "Set Point"
         },
         "data_description": {
           "target_hour": "Wake up time (e.g. 6:00)",
           "recoverycalc_hour": "Time when heating stops (e.g. 23:00)",
           "sensor_interior_temperature": "Room temperature sensor (e.g. sensor.room_temperature)",
-          "weather_entity": "Weather integration providing outdoor temperature and wind speed (e.g. weather.home, weather.meteo_france).",
+          "weather_entity": "Weather integration used for hourly forecasts and as fallback for current conditions (e.g. weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "If set, this sensor's reading is used instead of the weather entity's current temperature (e.g. sensor.ambient_temperature).",
+          "sensor_wind_speed": "If set, this sensor's reading is used instead of the weather entity's current wind speed (e.g. sensor.ambient_wind_speed).",
           "tsp": "Target temperature ({tsp_range})"
         }
       }
@@ -54,7 +58,9 @@
           "target_hour": "Target hour",
           "recoverycalc_hour": "Heating stop hour",
           "sensor_interior_temperature": "Interior temperature sensor",
-          "weather_entity": "Weather source (outdoor temperature)",
+          "weather_entity": "Weather source (forecasts + fallback conditions)",
+          "sensor_outdoor_temperature": "Outdoor temperature sensor (optional override)",
+          "sensor_wind_speed": "Wind speed sensor (optional override)",
           "tsp": "Set Point"
         },
         "data_description": {
@@ -62,7 +68,9 @@
           "target_hour": "Wake up time (e.g. 6:00)",
           "recoverycalc_hour": "Time when heating stops (e.g. 23:00)",
           "sensor_interior_temperature": "Room temperature sensor (e.g. sensor.room_temperature)",
-          "weather_entity": "Weather integration providing outdoor temperature and wind speed (e.g. weather.home, weather.meteo_france).",
+          "weather_entity": "Weather integration used for hourly forecasts and as fallback for current conditions (e.g. weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "If set, this sensor's reading is used instead of the weather entity's current temperature (e.g. sensor.ambient_temperature).",
+          "sensor_wind_speed": "If set, this sensor's reading is used instead of the weather entity's current wind speed (e.g. sensor.ambient_wind_speed).",
           "tsp": "Target temperature ({tsp_range})"
         }
       }

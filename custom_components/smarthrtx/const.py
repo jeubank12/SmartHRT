@@ -39,6 +39,8 @@ CONF_SENSOR_INTERIOR_TEMP = "sensor_interior_temperature"
 CONF_WEATHER_ENTITY = "weather_entity"
 CONF_TSP = "tsp"
 CONF_TEMP_UNIT = "temp_unit"  # UI temperature unit preference for config form
+CONF_SENSOR_OUTDOOR_TEMP = "sensor_outdoor_temperature"
+CONF_SENSOR_WIND_SPEED = "sensor_wind_speed"
 
 # Temperature unit options for the config form
 TEMP_UNIT_CELSIUS = "°C"
