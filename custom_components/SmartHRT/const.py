@@ -1,8 +1,8 @@
-"""Les constantes pour l'intégration SmartHRT.
+"""Constants for the SmartHRT integration.
 
-ADR implémentées dans ce module:
-- ADR-041: PERSISTED_FIELDS supprimé, remplacé par SmartHRTData.as_dict/from_dict
-- ADR-051: TimerKey pour la gestion centralisée des timers
+ADRs implemented in this module:
+- ADR-041: PERSISTED_FIELDS removed, replaced by SmartHRTData.as_dict/from_dict
+- ADR-051: TimerKey for centralized timer management
 """
 
 from enum import StrEnum
@@ -11,9 +11,9 @@ from homeassistant.const import Platform
 
 
 class TimerKey(StrEnum):
-    """Clés des timers gérés par le système (ADR-051).
+    """Keys for timers managed by the system (ADR-051).
 
-    Utilisées avec TimerManager pour identifier les timers de manière unique.
+    Used with TimerManager to uniquely identify timers.
     """
 
     RECOVERYCALC_HOUR = "recoverycalc_hour"
@@ -54,8 +54,8 @@ DEFAULT_RPTH_MIN = 0.0
 DEFAULT_RPTH_MAX = 19999.0
 DEFAULT_RELAXATION_FACTOR = 2.0
 
-# ADR-007: Compensation météo - seuils de vent pour interpolation
-# WIND_LOW: vent faible (utilise rcth_lw), WIND_HIGH: vent fort (utilise rcth_hw)
+# ADR-007: Weather compensation - wind thresholds for interpolation
+# WIND_LOW: low wind (uses rcth_lw), WIND_HIGH: high wind (uses rcth_hw)
 WIND_HIGH = 60.0
 WIND_LOW = 10.0
 
@@ -80,8 +80,8 @@ SERVICE_TRIGGER_CALCULATION = "trigger_calculation"
 # Weather forecast settings
 FORECAST_HOURS = 3
 
-# ADR-008: Validation arrêt par détection lag
-# Seuil de baisse de température pour confirmer l'arrêt réel du chauffage
+# ADR-008: Stop validation via lag detection
+# Temperature drop threshold to confirm that heating has actually stopped
 TEMP_DECREASE_THRESHOLD = 0.2  # °C
 
 # Default recoverycalc hour (23:00)

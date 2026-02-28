@@ -1,9 +1,9 @@
 """Implements the SmartHRT time entities.
 
-ADR implémentées dans ce module:
-- ADR-012: Exposition entités pour Lovelace (time comme entités HA)
-- ADR-014: Format des dates en fuseau local (dt_util.as_local())
-- ADR-027: Utilisation de CoordinatorEntity pour synchronisation automatique
+ADRs implemented in this module:
+- ADR-012: Expose entities for Lovelace (time as HA entities)
+- ADR-014: Format dates in local timezone (dt_util.as_local())
+- ADR-027: Use CoordinatorEntity for automatic synchronization
 """
 
 import logging
@@ -31,7 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
-    """Configuration des entités time à partir de la configuration ConfigEntry"""
+    """Set up time entities from the ConfigEntry configuration."""
 
     _LOGGER.debug("Calling time async_setup_entry entry=%s", entry)
 
@@ -48,12 +48,12 @@ async def async_setup_entry(
 
 
 class SmartHRTBaseTime(CoordinatorEntity[SmartHRTCoordinator], TimeEntity):
-    """Classe de base pour les entités time SmartHRT (ADR-027: CoordinatorEntity)."""
+    """Base class for SmartHRT time entities (ADR-027: CoordinatorEntity)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
-        """Initialisation de l'entité"""
+        """Initialize the entity."""
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
@@ -62,7 +62,7 @@ class SmartHRTBaseTime(CoordinatorEntity[SmartHRTCoordinator], TimeEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Retourne les informations du device"""
+        """Return device information."""
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, self._device_id)},
@@ -73,18 +73,18 @@ class SmartHRTBaseTime(CoordinatorEntity[SmartHRTCoordinator], TimeEntity):
 
 
 class SmartHRTTargetHourTime(SmartHRTBaseTime):
-    """Entité time pour l'heure cible (réveil)"""
+    """Time entity for the wake-up hour."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Heure cible"
+        self._attr_name = "Wake-up Hour"
         self._attr_unique_id = f"{self._device_id}_target_hour"
 
     @property
     def native_value(self) -> dt_time:
-        """Retourne l'heure cible depuis le coordinator"""
+        """Return the wake-up hour from the coordinator."""
         return self.coordinator.data.target_hour
 
     @property
@@ -92,24 +92,24 @@ class SmartHRTTargetHourTime(SmartHRTBaseTime):
         return "mdi:clock-end"
 
     async def async_set_value(self, value: dt_time) -> None:
-        """Mise à jour de l'heure cible"""
+        """Update the wake-up hour."""
         _LOGGER.info("Target hour changed to: %s", value)
         self.coordinator.set_target_hour(value)
 
 
 class SmartHRTRecoveryCalcHourTime(SmartHRTBaseTime):
-    """Entité time pour l'heure de coupure chauffage (soir)"""
+    """Time entity for the heating stop hour (evening)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Heure coupure chauffage"
+        self._attr_name = "Heating Stop Hour"
         self._attr_unique_id = f"{self._device_id}_recoverycalc_hour"
 
     @property
     def native_value(self) -> dt_time:
-        """Retourne l'heure de coupure depuis le coordinator"""
+        """Return the heating stop hour from the coordinator."""
         return self.coordinator.data.recoverycalc_hour
 
     @property
@@ -117,24 +117,24 @@ class SmartHRTRecoveryCalcHourTime(SmartHRTBaseTime):
         return "mdi:clock-in"
 
     async def async_set_value(self, value: dt_time) -> None:
-        """Mise à jour de l'heure de coupure"""
+        """Update the heating stop hour."""
         _LOGGER.info("Recovery calc hour changed to: %s", value)
         self.coordinator.set_recoverycalc_hour(value)
 
 
 class SmartHRTRecoveryStartTime(SmartHRTBaseTime):
-    """Entité time pour l'heure de relance (lecture seule)"""
+    """Time entity for the heating start hour (read-only, calculated automatically)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Heure de relance"
+        self._attr_name = "Heating Start Hour"
         self._attr_unique_id = f"{self._device_id}_recovery_start_time"
 
     @property
     def native_value(self) -> dt_time | None:
-        """Retourne l'heure de relance depuis le coordinator"""
+        """Return the heating start hour from the coordinator."""
         if self.coordinator.data.recovery_start_hour:
             local_time = dt_util.as_local(self.coordinator.data.recovery_start_hour)
             return local_time.time()
@@ -145,7 +145,7 @@ class SmartHRTRecoveryStartTime(SmartHRTBaseTime):
         return "mdi:radiator"
 
     async def async_set_value(self, value: dt_time) -> None:
-        """Cette entité est en lecture seule (calculée automatiquement)"""
+        """This entity is read-only (calculated automatically)."""
         _LOGGER.warning(
             "SmartHRT Recovery Start time is read-only and calculated automatically"
         )

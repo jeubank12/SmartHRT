@@ -1,10 +1,10 @@
 """Implements the SmartHRT switch entities.
 
-ADR implémentées dans ce module:
-- ADR-003: Activation/désactivation de la machine à états (SmartHeatingSwitch)
-- ADR-006: Mode adaptatif pour l'apprentissage (AdaptiveSwitch)
-- ADR-012: Exposition entités pour Lovelace (switches comme entités HA)
-- ADR-027: Utilisation de CoordinatorEntity pour synchronisation automatique
+ADRs implemented in this module:
+- ADR-003: Enable/disable the state machine (SmartHeatingSwitch)
+- ADR-006: Adaptive mode for learning (AdaptiveSwitch)
+- ADR-012: Expose entities for Lovelace (switches as HA entities)
+- ADR-027: Use CoordinatorEntity for automatic synchronization
 """
 
 import logging
@@ -30,7 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
-    """Configuration des entités switch à partir de la configuration ConfigEntry"""
+    """Set up switch entities from the ConfigEntry configuration."""
 
     _LOGGER.debug("Calling switch async_setup_entry entry=%s", entry)
 
@@ -46,12 +46,12 @@ async def async_setup_entry(
 
 
 class SmartHRTBaseSwitch(CoordinatorEntity[SmartHRTCoordinator], SwitchEntity):
-    """Classe de base pour les switch SmartHRT (ADR-027: CoordinatorEntity)."""
+    """Base class for SmartHRT switches (ADR-027: CoordinatorEntity)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
-        """Initialisation de base"""
+        """Initialize the base switch."""
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
@@ -60,7 +60,7 @@ class SmartHRTBaseSwitch(CoordinatorEntity[SmartHRTCoordinator], SwitchEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Retourne les informations du device"""
+        """Return device information."""
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, self._device_id)},
@@ -71,17 +71,17 @@ class SmartHRTBaseSwitch(CoordinatorEntity[SmartHRTCoordinator], SwitchEntity):
 
 
 class SmartHRTSmartHeatingSwitch(SmartHRTBaseSwitch):
-    """Switch pour activer/désactiver le mode chauffage intelligent.
+    """Switch to enable/disable smart heating mode.
 
-    ADR-003: Active/désactive la machine à états complète.
-    Quand désactivé, aucun calcul de relance n'est effectué.
+    ADR-003: Enables/disables the complete state machine.
+    When disabled, no heating start calculation is performed.
     """
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Mode chauffage intelligent"
+        self._attr_name = "Smart Heating Mode"
         self._attr_unique_id = f"{self._device_id}_smartheating_mode"
 
     @property
@@ -93,28 +93,28 @@ class SmartHRTSmartHeatingSwitch(SmartHRTBaseSwitch):
         return "mdi:home-thermometer" if self.is_on else "mdi:home-thermometer-outline"
 
     async def async_turn_on(self, **kwargs) -> None:
-        """Activer le mode chauffage intelligent"""
+        """Enable smart heating mode."""
         _LOGGER.info("SmartHeating mode enabled")
         self.coordinator.set_smartheating_mode(True)
 
     async def async_turn_off(self, **kwargs) -> None:
-        """Désactiver le mode chauffage intelligent"""
+        """Disable smart heating mode."""
         _LOGGER.info("SmartHeating mode disabled")
         self.coordinator.set_smartheating_mode(False)
 
 
 class SmartHRTAdaptiveSwitch(SmartHRTBaseSwitch):
-    """Switch pour activer/désactiver le mode adaptatif (auto-calibration).
+    """Switch to enable/disable adaptive mode (auto-calibration).
 
-    ADR-006: Active/désactive l'apprentissage continu des coefficients.
-    Quand activé, les RCth/RPth sont mis à jour après chaque cycle.
+    ADR-006: Enables/disables continuous learning of thermal coefficients.
+    When enabled, RCth/RPth are updated after each heating cycle.
     """
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Mode adaptatif"
+        self._attr_name = "Adaptive Mode"
         self._attr_unique_id = f"{self._device_id}_adaptive_mode"
 
     @property
@@ -126,11 +126,11 @@ class SmartHRTAdaptiveSwitch(SmartHRTBaseSwitch):
         return "mdi:brain" if self.is_on else "mdi:brain-off-outline"
 
     async def async_turn_on(self, **kwargs) -> None:
-        """Activer le mode adaptatif"""
+        """Enable adaptive mode."""
         _LOGGER.info("Adaptive mode enabled")
         self.coordinator.set_adaptive_mode(True)
 
     async def async_turn_off(self, **kwargs) -> None:
-        """Désactiver le mode adaptatif"""
+        """Disable adaptive mode."""
         _LOGGER.info("Adaptive mode disabled")
         self.coordinator.set_adaptive_mode(False)
