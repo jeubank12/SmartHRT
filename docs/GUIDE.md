@@ -1,10 +1,10 @@
-# SmartHRT User Guide
+# SmartHRTX User Guide
 
 **Installation, configuration, and everyday use**
 
-## What is SmartHRT?
+## What is SmartHRTX?
 
-SmartHRT automatically calculates the optimal time to start your heating in the morning to reach your desired temperature exactly at wake-up time. The system continuously learns your home's thermal characteristics to improve accuracy over time.
+SmartHRTX automatically calculates the optimal time to start your heating in the morning to reach your desired temperature exactly at wake-up time. The system continuously learns your home's thermal characteristics to improve accuracy over time.
 
 **Key features:**
 
@@ -20,15 +20,15 @@ SmartHRT automatically calculates the optimal time to start your heating in the 
 
 1. Open **HACS** in Home Assistant
 2. Go to **Integrations** → **⋯** (menu) → **Custom repositories**
-3. Add: `https://github.com/corentinBarban/SmartHRT`
+3. Add: `https://github.com/jeubank12/SmartHRT`
 4. Select category: **Integration**
-5. Search for **SmartHRT** and click **Install**
+5. Search for **SmartHRTX** and click **Install**
 6. Restart Home Assistant
 
 ### Option 2: Manual Installation
 
-1. Download the latest release from [GitHub](https://github.com/corentinBarban/SmartHRT/releases)
-2. Extract to: `config/custom_components/SmartHRT/`
+1. Download the latest release from [GitHub](https://github.com/jeubank12/SmartHRT/releases)
+2. Extract to: `config/custom_components/smarthrtx/`
 3. Restart Home Assistant
 
 ### Requirements
@@ -41,7 +41,7 @@ SmartHRT automatically calculates the optimal time to start your heating in the 
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **Create automation** (bottom right) or **+ Create Integration**
-3. Search for and select **SmartHRT**
+3. Search for and select **SmartHRTX**
 4. Fill in the configuration:
 
 | Field                           | Example                        | Description                                 |
@@ -110,12 +110,12 @@ These sensors have `device_class: timestamp` and can be used as automation trigg
 
 ```yaml
 alias: "Chauffage : Bascule matin <> soir (Avec Week-end)"
-description: Gère les cycles SmartHRT avec un horaire spécifique pour le week-end (10h-21h)
+description: Gère les cycles SmartHRTX avec un horaire spécifique pour le week-end (10h-21h)
 triggers:
-  - at: sensor.smarthrt_heure_de_relance
+  - at: sensor.smarthrtx_heure_de_relance
     id: start_heating
     trigger: time
-  - at: sensor.smarthrt_heure_coupure_timestamp
+  - at: sensor.smarthrtx_heure_coupure_timestamp
     id: fin_cycle
     trigger: time
 actions:
@@ -139,12 +139,12 @@ actions:
                 before: "12:00:00"
             then:
               - target:
-                  entity_id: time.smarthrt_heure_cible
+                  entity_id: time.smarthrtx_heure_cible
                 data:
                   time: "{{ soir_cible }}"
                 action: time.set_value
               - target:
-                  entity_id: time.smarthrt_heure_coupure_chauffage
+                  entity_id: time.smarthrtx_heure_coupure_chauffage
                 data:
                   time: "{{ soir_fin }}"
                 action: time.set_value
@@ -154,23 +154,23 @@ actions:
                     value_template: "{{ (now() + timedelta(days=1)).weekday() in [5, 6] }}"
                 then:
                   - target:
-                      entity_id: time.smarthrt_heure_cible
+                      entity_id: time.smarthrtx_heure_cible
                     data:
                       time: "{{ matin_cible_we }}"
                     action: time.set_value
                   - target:
-                      entity_id: time.smarthrt_heure_coupure_chauffage
+                      entity_id: time.smarthrtx_heure_coupure_chauffage
                     data:
                       time: "{{ soir_fin }}"
                     action: time.set_value
                 else:
                   - target:
-                      entity_id: time.smarthrt_heure_cible
+                      entity_id: time.smarthrtx_heure_cible
                     data:
                       time: "{{ matin_cible }}"
                     action: time.set_value
                   - target:
-                      entity_id: time.smarthrt_heure_coupure_chauffage
+                      entity_id: time.smarthrtx_heure_coupure_chauffage
                     data:
                       time: "{{ matin_fin }}"
                     action: time.set_value
@@ -252,7 +252,7 @@ These entities allow users to modify schedule settings via the UI:
 
 **Solution:**
 
-1. Check **Settings** → **System** → **Logs** for SmartHRT errors
+1. Check **Settings** → **System** → **Logs** for SmartHRTX errors
 2. Verify all sensor entities exist and are valid
 3. Check weather entity is properly configured
 4. Restart Home Assistant
@@ -279,8 +279,8 @@ A: Only for weather data (wind/temperature forecasts). Works fine with local-onl
 
 ## Getting Help
 
-- **GitHub Issues:** [Report bugs](https://github.com/corentinBarban/SmartHRT/issues)
-- **GitHub Discussions:** [Ask questions](https://github.com/corentinBarban/SmartHRT/discussions)
+- **GitHub Issues:** [Report bugs](https://github.com/jeubank12/SmartHRT/issues)
+- **GitHub Discussions:** [Ask questions](https://github.com/jeubank12/SmartHRT/discussions)
 - **Home Assistant Community:** [Forum](https://community.home-assistant.io/)
 
 ---

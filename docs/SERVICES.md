@@ -1,10 +1,10 @@
-# SmartHRT Services
+# SmartHRTX Services
 
-This document describes the available services to control SmartHRT and their relationship with the state machine.
+This document describes the available services to control SmartHRTX and their relationship with the state machine.
 
 ## State Machine
 
-SmartHRT uses an explicit state machine to model the daily thermal cycle:
+SmartHRTX uses an explicit state machine to model the daily thermal cycle:
 
 ```
 HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESS → HEATING_ON
@@ -45,7 +45,7 @@ message: "Heating cycle started"
 **Example call**:
 
 ```yaml
-service: smarthrt.start_heating_cycle
+service: smarthrtx.start_heating_cycle
 ```
 
 ---
@@ -78,7 +78,7 @@ message: "Heating stopped, monitoring started"
 **Example call**:
 
 ```yaml
-service: smarthrt.stop_heating
+service: smarthrtx.stop_heating
 ```
 
 **⚠️ Note**: This service is normally called automatically at `recoverycalc_hour` (default 11:00 PM).
@@ -114,7 +114,7 @@ message: "Recovery started"
 **Example call**:
 
 ```yaml
-service: smarthrt.start_recovery
+service: smarthrtx.start_recovery
 ```
 
 **⚠️ Note**: This service is normally called automatically at `recovery_start_hour`.
@@ -150,7 +150,7 @@ message: "Recovery ended"
 **Example call**:
 
 ```yaml
-service: smarthrt.end_recovery
+service: smarthrtx.end_recovery
 ```
 
 **⚠️ Note**: This service is normally called automatically at `target_hour` (wake-up time) or when the setpoint is reached.
@@ -187,7 +187,7 @@ rpth: 48.7
 **Example call**:
 
 ```yaml
-service: smarthrt.get_state
+service: smarthrtx.get_state
 response_variable: state_info
 ```
 
@@ -208,7 +208,7 @@ Resets all learned thermal coefficients to default values (50).
 **Example**:
 
 ```yaml
-service: smarthrt.reset_learning
+service: smarthrtx.reset_learning
 ```
 
 ---
@@ -226,7 +226,7 @@ Immediately triggers a new recovery time calculation.
 **Example**:
 
 ```yaml
-service: smarthrt.trigger_calculation
+service: smarthrtx.trigger_calculation
 ```
 
 ---
@@ -254,53 +254,53 @@ Use the simplified services instead:
 ```yaml
 # Automation 1: Stop heating in the evening
 automation:
-  - alias: "SmartHRT - Stop heating at 11 PM"
+  - alias: "SmartHRTX - Stop heating at 11 PM"
     trigger:
       - platform: time
         at: "23:00:00"
     action:
-      - service: smarthrt.stop_heating
+      - service: smarthrtx.stop_heating
 
 # Automation 2: Start recovery (automatic via recovery_start_hour)
-# No automation needed, SmartHRT triggers automatically
+# No automation needed, SmartHRTX triggers automatically
 
 # Automation 3: End recovery at wake-up
 automation:
-  - alias: "SmartHRT - End recovery at wake-up"
+  - alias: "SmartHRTX - End recovery at wake-up"
     trigger:
       - platform: time
         at: "06:00:00"
     action:
-      - service: smarthrt.end_recovery
+      - service: smarthrtx.end_recovery
 ```
 
 ### Force a new cycle
 
 ```yaml
 automation:
-  - alias: "SmartHRT - Reset cycle after absence"
+  - alias: "SmartHRTX - Reset cycle after absence"
     trigger:
       - platform: state
         entity_id: person.home
         to: "home"
     action:
-      - service: smarthrt.start_heating_cycle
+      - service: smarthrtx.start_heating_cycle
 ```
 
 ### Debug and monitoring
 
 ```yaml
 automation:
-  - alias: "SmartHRT - Log state every hour"
+  - alias: "SmartHRTX - Log state every hour"
     trigger:
       - platform: time_pattern
         hours: "/1"
     action:
-      - service: smarthrt.get_state
+      - service: smarthrtx.get_state
         response_variable: state
       - service: system_log.write
         data:
-          message: "SmartHRT state: {{ state.state }}, Recovery in: {{ state.time_to_recovery_hours }}h"
+          message: "SmartHRTX state: {{ state.state }}, Recovery in: {{ state.time_to_recovery_hours }}h"
           level: info
 ```
 
@@ -308,10 +308,10 @@ automation:
 
 ## Multi-Instance
 
-If you have multiple SmartHRT instances configured, you must specify the `entry_id` parameter to target a specific instance:
+If you have multiple SmartHRTX instances configured, you must specify the `entry_id` parameter to target a specific instance:
 
 ```yaml
-service: smarthrt.stop_heating
+service: smarthrtx.stop_heating
 data:
   entry_id: "abc123def456"
 ```
@@ -322,7 +322,7 @@ To find your `entry_id`, check the logs at startup or use Home Assistant's Devel
 
 ## Important Notes
 
-1. **Automatic mode**: In most cases, you don't need to call these services manually. SmartHRT automatically manages state transitions.
+1. **Automatic mode**: In most cases, you don't need to call these services manually. SmartHRTX automatically manages state transitions.
 
 2. **Recommended services**: Always prefer simplified services (`start_heating_cycle`, `stop_heating`, etc.) over legacy services.
 
