@@ -38,12 +38,24 @@ CONF_RECOVERYCALC_HOUR = "recoverycalc_hour"
 CONF_SENSOR_INTERIOR_TEMP = "sensor_interior_temperature"
 CONF_WEATHER_ENTITY = "weather_entity"
 CONF_TSP = "tsp"
+CONF_TEMP_UNIT = "temp_unit"  # UI temperature unit preference for config form
 
-# Default values
+# Temperature unit options for the config form
+TEMP_UNIT_CELSIUS = "°C"
+TEMP_UNIT_FAHRENHEIT = "°F"
+DEFAULT_TEMP_UNIT = TEMP_UNIT_CELSIUS
+
+# Default values (internal storage always in Celsius)
 DEFAULT_TSP = 19.0
 DEFAULT_TSP_MIN = 13.0
 DEFAULT_TSP_MAX = 26.0
 DEFAULT_TSP_STEP = 0.1
+
+# Equivalent Set Point limits in Fahrenheit for the config form
+DEFAULT_TSP_MIN_F = 55.0   # ≈ 13 °C
+DEFAULT_TSP_MAX_F = 79.0   # ≈ 26 °C
+DEFAULT_TSP_STEP_F = 0.5
+DEFAULT_TSP_F = 66.0       # ≈ 19 °C
 
 # Thermal coefficients defaults
 DEFAULT_RCTH = 50.0
