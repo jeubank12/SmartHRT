@@ -28,7 +28,7 @@
           "recoverycalc_hour": "Time when heating stops (e.g. 23:00)",
           "sensor_interior_temperature": "Room temperature sensor (e.g. sensor.room_temperature)",
           "weather_entity": "Weather integration providing outdoor temperature and wind speed (e.g. weather.home, weather.meteo_france).",
-          "tsp": "Target temperature (13-26°C)"
+          "tsp": "Target temperature ({tsp_range})"
         }
       }
     },
@@ -36,7 +36,8 @@
       "weather_not_found": "Weather entity not found",
       "weather_incompatible": "Weather entity does not support forecasts",
       "sensor_not_found": "Temperature sensor not found",
-      "tsp_out_of_range": "Target temperature out of range (13-26°C)",
+      "tsp_out_of_range": "Target temperature out of range (13–26 °C)",
+      "tsp_out_of_range_f": "Target temperature out of range (55–79 °F)",
       "invalid_time_sequence": "Heating stop hour must precede target hour",
       "invalid_name": "Invalid name",
       "unknown_error": "Configuration error"
@@ -62,7 +63,7 @@
           "recoverycalc_hour": "Time when heating stops (e.g. 23:00)",
           "sensor_interior_temperature": "Room temperature sensor (e.g. sensor.room_temperature)",
           "weather_entity": "Weather integration providing outdoor temperature and wind speed (e.g. weather.home, weather.meteo_france).",
-          "tsp": "Target temperature (13-26°C)"
+          "tsp": "Target temperature ({tsp_range})"
         }
       }
     }
