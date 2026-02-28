@@ -1,10 +1,10 @@
-# SmartHRT Architecture Guide
+# SmartHRTX Architecture Guide
 
 **Technical architecture, design patterns, and thermal calculations**
 
 ## System Overview
 
-SmartHRT is a Home Assistant custom integration built on the **DataUpdateCoordinator** pattern. It automates heating startup calculations using adaptive thermal modeling.
+SmartHRTX is a Home Assistant custom integration built on the **DataUpdateCoordinator** pattern. It automates heating startup calculations using adaptive thermal modeling.
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -27,7 +27,7 @@ SmartHRT is a Home Assistant custom integration built on the **DataUpdateCoordin
 
 ## State Machine
 
-SmartHRT uses a **5-state finite state machine** for the daily heating cycle:
+SmartHRTX uses a **5-state finite state machine** for the daily heating cycle:
 
 ```
 Evening (23:00)          Night              Morning           Wake-up (06:00)
@@ -51,7 +51,7 @@ Evening (23:00)          Night              Morning           Wake-up (06:00)
 
 ## Thermal Model
 
-SmartHRT models your home using **two key constants:**
+SmartHRTX models your home using **two key constants:**
 
 ### RCth - Cooling Constant
 
@@ -174,15 +174,15 @@ Where $\alpha$ (learning rate) decays over time for stability.
 
 ## Services
 
-### smarthrt.on_heating_stop
+### smarthrtx.on_heating_stop
 
 Called when heating stops (evening). Records baseline temperature for next calculation.
 
-### smarthrt.on_recovery_start
+### smarthrtx.on_recovery_start
 
 Called when heating starts (morning). Triggers RPth measurement mode.
 
-### smarthrt.on_recovery_end
+### smarthrtx.on_recovery_end
 
 Called at target hour. Finalizes learning and resets for next day.
 
@@ -204,7 +204,7 @@ Called at target hour. Finalizes learning and resets for next day.
 
 ## Wind Speed Integration
 
-Wind data comes from the weather entity (3-hour forecast window). SmartHRT automatically:
+Wind data comes from the weather entity (3-hour forecast window). SmartHRTX automatically:
 
 1. Reads current/forecasted wind speed
 2. Interpolates thermal coefficients

@@ -1,4 +1,4 @@
-# Contributing to SmartHRT
+# Contributing to SmartHRTX
 
 **Development guide for contributors**
 
@@ -18,7 +18,7 @@
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/corentinBarban/SmartHRT.git
+git clone https://github.com/jeubank12/SmartHRT.git
 cd SmartHRT
 ```
 
@@ -57,7 +57,7 @@ Access at `http://localhost:8123`
 
 ```
 SmartHRT/
-├── custom_components/SmartHRT/
+├── custom_components/smarthrtx/
 │   ├── __init__.py           # Integration entry point
 │   ├── coordinator.py        # Main logic
 │   ├── config_flow.py        # Configuration UI
@@ -113,7 +113,7 @@ black .
 isort .
 
 # Lint code
-pylint custom_components/SmartHRT/*.py
+pylint custom_components/smarthrtx/*.py
 ```
 
 ## Testing
@@ -125,7 +125,7 @@ pylint custom_components/SmartHRT/*.py
 pytest
 
 # Run with coverage
-pytest --cov=custom_components/SmartHRT
+pytest --cov=custom_components/smarthrtx
 
 # Run specific test
 pytest tests/test_coordinator.py::test_example
@@ -160,7 +160,7 @@ async def test_recovery_calculation():
 
 ### Before You Start
 
-1. Check [GitHub Issues](https://github.com/corentinBarban/SmartHRT/issues) for existing work
+1. Check [GitHub Issues](https://github.com/jeubank12/SmartHRT/issues) for existing work
 2. For major features, open a discussion first
 3. Read the [Architecture Guide](ARCHITECTURE.md)
 
@@ -182,7 +182,7 @@ async def test_recovery_calculation():
    ```bash
    pytest
    black .
-   pylint custom_components/SmartHRT/*.py
+   pylint custom_components/smarthrtx/*.py
    ```
 
 4. **Push and create PR:**
@@ -195,7 +195,7 @@ async def test_recovery_calculation():
 
 - [ ] Code follows style guide (Black, isort, pylint)
 - [ ] Tests added/updated for new features
-- [ ] Tests pass: `pytest --cov=custom_components/SmartHRT`
+- [ ] Tests pass: `pytest --cov=custom_components/smarthrtx`
 - [ ] Docstrings added/updated
 - [ ] Commit messages are clear
 - [ ] No debug print statements left
@@ -265,7 +265,7 @@ uv run .devcontainer/hass_debug.sh
 **"Import errors in tests"**
 
 - Run: `pip install -e .`
-- Or run: `export PYTHONPATH=/workspaces/SmartHRT`
+- Or run: `export PYTHONPATH=/workspaces/SmartHRT  # adjust to your clone path`
 
 **"Tests fail locally but work in CI"**
 
@@ -305,10 +305,10 @@ Maintainers handle:
 
 ## Questions or Issues?
 
-- Open a [GitHub Issue](https://github.com/corentinBarban/SmartHRT/issues)
-- Ask in [Discussions](https://github.com/corentinBarban/SmartHRT/discussions)
+- Open a [GitHub Issue](https://github.com/jeubank12/SmartHRT/issues)
+- Ask in [Discussions](https://github.com/jeubank12/SmartHRT/discussions)
 - Check [GUIDE.md](GUIDE.md) troubleshooting section
 
 ---
 
-**Thank you for contributing to SmartHRT!**
+**Thank you for contributing to SmartHRTX!**

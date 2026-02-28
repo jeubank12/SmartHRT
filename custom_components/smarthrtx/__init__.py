@@ -210,7 +210,7 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
             {
                 "title": "SmartHRTX - Configuration invalide",
                 "message": f"Erreur de validation: {e}",
-                "notification_id": "smarthrt_config_error",
+                "notification_id": "smarthrtx_config_error",
             },
         )
         return  # Ne pas appliquer la configuration invalide
