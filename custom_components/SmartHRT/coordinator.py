@@ -1,37 +1,37 @@
-"""Coordinator pour SmartHRT - Gère la logique de chauffage intelligent.
+"""Coordinator for SmartHRT - Manages the smart heating logic.
 
-ADR implémentées dans ce module:
-- ADR-002: Sélection explicite de l'entité météo (weather_entity_id)
-- ADR-003: Machine à états explicite (SmartHRTState)
-- ADR-004: Stratégie hybride de persistance (_save/_restore_learned_data)
-- ADR-005: Stratégie de pilotage anticipation (via core.ThermalSolver)
-- ADR-006: Apprentissage continu (via core.ThermalSolver)
-- ADR-007: Compensation météo interpolation vent (via core.ThermalSolver)
-- ADR-008: Validation arrêt par détection lag (TEMP_DECREASE_THRESHOLD)
-- ADR-009: Persistance coefficients (PERSISTED_FIELDS, Store)
-- ADR-013: Historique vent pour calcul (wind_speed_history, wind_speed_avg)
-- ADR-014: Format des dates (dt_util.now(), dt_util.as_local())
-- ADR-018: Identification instance dans les logs (_log_prefix)
-- ADR-019: Restauration état après redémarrage (_restore_state_after_restart)
-- ADR-020: Initialisation météo différée (EVENT_HOMEASSISTANT_STARTED)
-- ADR-021: Triggers dynamiques (_schedule_recovery_start, async_track_point_in_time)
-- ADR-022: Calcul itératif anticipation (via core.ThermalSolver, 20 itérations)
-- ADR-023: Protection erreurs setters (try/except dans _schedule_recovery_start)
-- ADR-024: Sérialisation types (PERSISTED_FIELDS avec datetime, time, list)
-- ADR-025: Fréquence dynamique recalcul (via core.ThermalSolver)
-- ADR-026: Extraction modèle thermique (core.ThermalSolver, core.ThermalState)
-- ADR-027: Héritage DataUpdateCoordinator (notifications automatiques, CoordinatorEntity)
-- ADR-028: Modernisation StrEnum pour machine à états (SmartHRTState, VALID_TRANSITIONS)
-- ADR-029: Validation données persistées avec Pydantic (models.py)
-- ADR-033: Découplage logique état (SmartHRTStateMachine)
-- ADR-034: Gestion centralisée effets de bord (Action handlers)
-- ADR-035: Immuabilité état (transitions atomiques)
-- ADR-036: Factorisation setters (_update_and_recalculate)
-- ADR-037: Suppression polling minute (listener météo push)
-- ADR-039: Simplification restauration (auto-correction, _is_state_coherent)
-- ADR-040: Délégation flags à la machine à états (propriétés calculées)
-- ADR-041: Sérialisation globale via as_dict/from_dict (remplace PERSISTED_FIELDS)
-- ADR-047: Unification du modèle de données (Single Source of Truth)
+ADRs implemented in this module:
+- ADR-002: Explicit weather entity selection (weather_entity_id)
+- ADR-003: Explicit state machine (SmartHRTState)
+- ADR-004: Hybrid persistence strategy (_save/_restore_learned_data)
+- ADR-005: Predictive control strategy (via core.ThermalSolver)
+- ADR-006: Continuous learning (via core.ThermalSolver)
+- ADR-007: Weather compensation wind interpolation (via core.ThermalSolver)
+- ADR-008: Stop validation via lag detection (TEMP_DECREASE_THRESHOLD)
+- ADR-009: Coefficient persistence (PERSISTED_FIELDS, Store)
+- ADR-013: Wind history for calculation (wind_speed_history, wind_speed_avg)
+- ADR-014: Date formatting (dt_util.now(), dt_util.as_local())
+- ADR-018: Instance identification in logs (_log_prefix)
+- ADR-019: State restoration after restart (_restore_state_after_restart)
+- ADR-020: Deferred weather initialization (EVENT_HOMEASSISTANT_STARTED)
+- ADR-021: Dynamic triggers (_schedule_recovery_start, async_track_point_in_time)
+- ADR-022: Iterative predictive calculation (via core.ThermalSolver, 20 iterations)
+- ADR-023: Setter error protection (try/except in _schedule_recovery_start)
+- ADR-024: Type serialization (PERSISTED_FIELDS with datetime, time, list)
+- ADR-025: Dynamic recalculation frequency (via core.ThermalSolver)
+- ADR-026: Thermal model extraction (core.ThermalSolver, core.ThermalState)
+- ADR-027: DataUpdateCoordinator inheritance (automatic notifications, CoordinatorEntity)
+- ADR-028: StrEnum modernization for state machine (SmartHRTState, VALID_TRANSITIONS)
+- ADR-029: Persisted data validation with Pydantic (models.py)
+- ADR-033: State logic decoupling (SmartHRTStateMachine)
+- ADR-034: Centralized side-effect management (Action handlers)
+- ADR-035: State immutability (atomic transitions)
+- ADR-036: Setter factorization (_update_and_recalculate)
+- ADR-037: Removal of minute polling (push weather listener)
+- ADR-039: Simplified restoration (auto-correction, _is_state_coherent)
+- ADR-040: Flag delegation to state machine (calculated properties)
+- ADR-041: Global serialization via as_dict/from_dict (replaces PERSISTED_FIELDS)
+- ADR-047: Unified data model (Single Source of Truth)
 """
 
 import asyncio
@@ -53,6 +53,8 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
     EVENT_HOMEASSISTANT_STARTED,
+    UnitOfTemperature,
+    UnitOfSpeed,
 )
 from homeassistant.util import dt as dt_util
 from homeassistant.exceptions import ServiceNotFound
@@ -635,13 +637,13 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                     recovery_start,
                 )
                 _LOGGER.info(
-                    "%s Trigger RECOVERY_START programmé pour %s",
+                    "%s RECOVERY_START trigger scheduled for %s",
                     self._log_prefix(),
                     recovery_start.time(),
                 )
             else:
                 _LOGGER.debug(
-                    "%s recovery_start_hour %s est dans le passé, trigger non programmé",
+                    "%s recovery_start_hour %s is in the past, trigger not scheduled",
                     self._log_prefix(),
                     recovery_start,
                 )
@@ -659,18 +661,18 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                 )
 
     def _cancel_time_triggers(self) -> None:
-        """Annule les déclencheurs horaires (ADR-051)."""
+        """Cancel time-based triggers (ADR-051)."""
         self._timer_manager.cancel(TimerKey.RECOVERYCALC_HOUR)
         self._timer_manager.cancel(TimerKey.TARGET_HOUR)
         self._timer_manager.cancel(TimerKey.RECOVERY_START)
         self._timer_manager.cancel(TimerKey.RECOVERY_UPDATE)
 
     async def async_unload(self) -> None:
-        """Déchargement du coordinateur (ADR-051)."""
-        # ADR-051: Annulation de tous les timers en une seule opération
+        """Unload the coordinator (ADR-051)."""
+        # ADR-051: Cancel all timers in one operation
         self._timer_manager.cancel_all()
 
-        # Annuler les listeners d'événements
+        # Cancel event listeners
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
@@ -680,12 +682,16 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
     # ─────────────────────────────────────────────────────────────────────────
 
     async def _update_initial_states(self) -> None:
-        """Récupération des états initiaux"""
+        """Fetch initial states from sensors and weather."""
         if self._interior_temp_sensor_id:
             state = self.hass.states.get(self._interior_temp_sensor_id)
             if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
-                    self.data.interior_temp = float(state.state)
+                    raw_temp = float(state.state)
+                    unit = state.attributes.get("unit_of_measurement", "")
+                    if unit == UnitOfTemperature.FAHRENHEIT:
+                        raw_temp = (raw_temp - 32) * 5 / 9
+                    self.data.interior_temp = raw_temp
                 except ValueError:
                     pass
 
@@ -693,7 +699,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
     @callback
     def _on_sensor_state_change(self, event) -> None:
-        """Callback lors d'un changement d'état du capteur de température."""
+        """Callback when the temperature sensor state changes."""
         new_state = event.data.get("new_state")
         if not new_state or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             return
@@ -702,7 +708,11 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
         if entity_id == self._interior_temp_sensor_id:
             try:
-                self.data.interior_temp = float(new_state.state)
+                raw_temp = float(new_state.state)
+                unit = new_state.attributes.get("unit_of_measurement", "")
+                if unit == UnitOfTemperature.FAHRENHEIT:
+                    raw_temp = (raw_temp - 32) * 5 / 9
+                self.data.interior_temp = raw_temp
                 self._check_temperature_thresholds()
             except ValueError:
                 pass
@@ -711,11 +721,10 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
     @callback
     def _on_weather_state_change(self, event) -> None:
-        """Callback lors d'un changement d'état de l'entité météo.
+        """Callback when the weather entity state changes.
 
-        ADR-037: Remplace le polling périodique d'une minute.
-        Met à jour les données météo et la moyenne de vent uniquement
-        quand l'entité météo change réellement.
+        ADR-037: Replaces the periodic one-minute polling.
+        Updates weather data and wind average only when the weather entity actually changes.
         """
         new_state = event.data.get("new_state")
         if not new_state or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
@@ -727,19 +736,19 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
     @callback
     def _hourly_forecast_update(self, _now) -> None:
-        """Mise à jour des prévisions météo (chaque heure)"""
+        """Update weather forecasts (every hour)."""
         self.hass.async_create_task(self._update_weather_forecasts())
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Déclencheurs horaires (équivalent des automations YAML)
+    # Time-based triggers (equivalent to YAML automations)
     # ─────────────────────────────────────────────────────────────────────────
 
     @callback
     def _on_recoverycalc_hour(self, _now) -> None:
-        """Appelé à l'heure de coupure du chauffage (recoverycalc_hour)
-        Équivalent de l'automation 'heatingstopTIME' du YAML
+        """Called at the heating stop hour (recoverycalc_hour).
+        Equivalent to the 'heatingstopTIME' YAML automation.
         """
-        _LOGGER.info("%s Heure de coupure chauffage atteinte", self._log_prefix())
+        _LOGGER.info("%s Heating stop hour reached", self._log_prefix())
 
         if not self.data.smartheating_mode:
             self._reschedule_recoverycalc_hour()
@@ -765,7 +774,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
             self.data.rcth_hw = 50.0
             self.data.rpth_lw = 50.0
             self.data.rpth_hw = 50.0
-            _LOGGER.info("%s Initialisation des constantes à 50", self._log_prefix())
+            _LOGGER.info("%s Initializing thermal constants to 50", self._log_prefix())
 
         # Enregistre les valeurs courantes (snapshot avant refroidissement)
         self.data.time_recovery_calc = dt_util.now()
@@ -777,7 +786,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         if not self.transition_to(SmartHRTState.DETECTING_LAG):
             self.force_state(SmartHRTState.DETECTING_LAG)
         # ADR-040: temp_lag_detection_active est maintenant calculé depuis current_state
-        _LOGGER.debug("%s Transition vers état DETECTING_LAG", self._log_prefix())
+        _LOGGER.debug("%s Transitioning to DETECTING_LAG state", self._log_prefix())
 
         # Sauvegarder l'heure de relance avant calcul
         prev_recovery_start = self.data.recovery_start_hour
@@ -811,21 +820,21 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
     @callback
     def _on_recovery_start_hour(self, _now) -> None:
-        """Appelé à l'heure calculée de démarrage de la relance (recoverystart_hour)
-        Équivalent de l'automation 'boostTIME' du YAML
+        """Called at the calculated heating start hour (recoverystart_hour).
+        Equivalent to the 'boostTIME' YAML automation.
         """
-        _LOGGER.info("%s Heure de démarrage relance atteinte", self._log_prefix())
+        _LOGGER.info("%s Heating start hour reached", self._log_prefix())
 
         if not self.data.smartheating_mode:
             return
 
-        # Éviter de déclencher si on est déjà en RECOVERY ou HEATING_PROCESS
+        # Avoid triggering if already in RECOVERY or HEATING_PROCESS
         if self.data.current_state in (
             SmartHRTState.RECOVERY,
             SmartHRTState.HEATING_PROCESS,
         ):
             _LOGGER.debug(
-                "%s Relance ignorée, déjà en état %s",
+                "%s Heating start skipped, already in state %s",
                 self._log_prefix(),
                 self.data.current_state,
             )
@@ -835,10 +844,10 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
     @callback
     def _on_target_hour(self, _now) -> None:
-        """Appelé à l'heure cible (target_hour / réveil)
-        Équivalent de l'automation 'recoveryendTIME' du YAML
+        """Called at the target hour (target_hour / wake-up time).
+        Equivalent to the 'recoveryendTIME' YAML automation.
         """
-        _LOGGER.info("%s Heure cible atteinte", self._log_prefix())
+        _LOGGER.info("%s Wake-up hour reached", self._log_prefix())
 
         if self.data.smartheating_mode and self.data.rp_calc_mode:
             self.on_recovery_end()
@@ -847,8 +856,8 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
 
     @callback
     def _on_recovery_update_hour(self, _now) -> None:
-        """Appelé pour mettre à jour le calcul de l'heure de relance
-        Équivalent de l'automation 'Nth_RECOVERY_calc' du YAML
+        """Called to update the heating start time calculation.
+        Equivalent to the 'Nth_RECOVERY_calc' YAML automation.
         """
         if not self.data.smartheating_mode:
             return
@@ -984,7 +993,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         """
         if not self._weather_entity_id:
             _LOGGER.debug(
-                "%s Aucune entité météo configurée, mise à jour météo ignorée",
+                "%s No weather entity configured, weather update skipped",
                 self._log_prefix(),
             )
             return
@@ -992,18 +1001,32 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         weather = self.hass.states.get(self._weather_entity_id)
         if weather is None:
             _LOGGER.warning(
-                "%s Entité météo %s non trouvée",
+                "%s Weather entity %s not found",
                 self._log_prefix(),
                 self._weather_entity_id,
             )
             return
 
         if (temp := weather.attributes.get("temperature")) is not None:
-            self.data.exterior_temp = float(temp)
+            temp_val = float(temp)
+            temp_unit = weather.attributes.get("temperature_unit", "")
+            if temp_unit == UnitOfTemperature.FAHRENHEIT:
+                temp_val = (temp_val - 32) * 5 / 9
+            self.data.exterior_temp = temp_val
 
         if (wind := weather.attributes.get("wind_speed")) is not None:
-            self.data.wind_speed = float(wind) / 3.6  # km/h -> m/s
-            # Ajouter à l'historique pour la moyenne
+            wind_val = float(wind)
+            wind_unit = weather.attributes.get("wind_speed_unit", UnitOfSpeed.KILOMETERS_PER_HOUR)
+            # Normalize all wind speeds to m/s for internal calculations
+            if wind_unit == UnitOfSpeed.KILOMETERS_PER_HOUR:
+                wind_val = wind_val / 3.6
+            elif wind_unit == UnitOfSpeed.MILES_PER_HOUR:
+                wind_val = wind_val * 0.44704
+            elif wind_unit == UnitOfSpeed.KNOTS:
+                wind_val = wind_val * 0.514444
+            # UnitOfSpeed.METERS_PER_SECOND: no conversion needed
+            self.data.wind_speed = wind_val
+            # Add to history for average calculation
             self.data.wind_speed_history.append(self.data.wind_speed)
 
         self._calculate_windchill()
@@ -1022,7 +1045,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         """
         if not self._weather_entity_id:
             _LOGGER.debug(
-                "%s Aucune entité météo configurée, mise à jour prévisions ignorée",
+                "%s No weather entity configured, forecast update skipped",
                 self._log_prefix(),
             )
             return
@@ -1033,7 +1056,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
             # Vérifier que le service existe avant de l'appeler
             if not self.hass.services.has_service("weather", "get_forecasts"):
                 _LOGGER.debug(
-                    "%s Service weather.get_forecasts pas encore disponible (démarrage en cours)",
+                    "%s Service weather.get_forecasts not yet available (startup in progress)",
                     self._log_prefix(),
                 )
                 return
@@ -1056,7 +1079,22 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                         forecasts = forecast_list[:FORECAST_HOURS]
 
                         if forecasts:
-                            # Moyenne température
+                            # Determine weather entity units for forecast conversion
+                            weather_state = self.hass.states.get(entity_id)
+                            forecast_temp_unit = (
+                                weather_state.attributes.get("temperature_unit", "")
+                                if weather_state
+                                else ""
+                            )
+                            forecast_wind_unit = (
+                                weather_state.attributes.get(
+                                    "wind_speed_unit",
+                                    UnitOfSpeed.KILOMETERS_PER_HOUR,
+                                )
+                                if weather_state
+                                else UnitOfSpeed.KILOMETERS_PER_HOUR
+                            )
+
                             temps: list[float] = []
                             winds: list[float] = []
 
@@ -1064,11 +1102,22 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                                 if isinstance(f, dict):
                                     temp_val = f.get("temperature")
                                     if isinstance(temp_val, (int, float)):
-                                        temps.append(float(temp_val))
+                                        temp_c = float(temp_val)
+                                        if forecast_temp_unit == UnitOfTemperature.FAHRENHEIT:
+                                            temp_c = (temp_c - 32) * 5 / 9
+                                        temps.append(temp_c)
 
                                     wind_val = f.get("wind_speed")
                                     if isinstance(wind_val, (int, float)):
-                                        winds.append(float(wind_val))
+                                        w = float(wind_val)
+                                        if forecast_wind_unit == UnitOfSpeed.KILOMETERS_PER_HOUR:
+                                            w = w / 3.6
+                                        elif forecast_wind_unit == UnitOfSpeed.MILES_PER_HOUR:
+                                            w = w * 0.44704
+                                        elif forecast_wind_unit == UnitOfSpeed.KNOTS:
+                                            w = w * 0.514444
+                                        # UnitOfSpeed.METERS_PER_SECOND: no conversion
+                                        winds.append(w)
 
                             if temps:
                                 self.data.temperature_forecast_avg = sum(temps) / len(
@@ -1081,19 +1130,19 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                                 )
 
                             _LOGGER.debug(
-                                "%s Prévisions mises à jour: temp=%.1f°C, vent=%.1fkm/h",
+                                "%s Forecasts updated: temp=%.1f°C, wind=%.1fkm/h",
                                 self._log_prefix(),
                                 self.data.temperature_forecast_avg,
                                 self.data.wind_speed_forecast_avg,
                             )
         except ServiceNotFound:
             _LOGGER.debug(
-                "%s Service weather.get_forecasts non disponible au démarrage",
+                "%s Service weather.get_forecasts not available at startup",
                 self._log_prefix(),
             )
         except Exception as ex:
             _LOGGER.warning(
-                "%s Erreur lors de la récupération des prévisions météo: %s",
+                "%s Error fetching weather forecasts: %s",
                 self._log_prefix(),
                 ex,
             )

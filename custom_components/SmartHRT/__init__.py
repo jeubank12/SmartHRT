@@ -1,10 +1,10 @@
-"""Initialisation du package de l'intégration SmartHRT.
+"""Package initialization for the SmartHRT integration.
 
-ADR implémentées dans ce module:
-- ADR-001: Architecture globale (setup/async_unload_entry)
-- ADR-012: Exposition entités pour Lovelace (forward_entry_setups)
-- ADR-016: Nettoyage des entités time obsolètes
-- ADR-045: Validation Pydantic au runtime pour la configuration
+ADRs implemented in this module:
+- ADR-001: Global architecture (setup/async_unload_entry)
+- ADR-012: Expose entities for Lovelace (forward_entry_setups)
+- ADR-016: Cleanup of obsolete time entities
+- ADR-045: Pydantic runtime validation for configuration
 """
 
 import logging

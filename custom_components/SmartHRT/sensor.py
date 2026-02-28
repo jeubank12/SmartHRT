@@ -1,11 +1,11 @@
 """Implements the SmartHRT sensors component.
 
-ADR implémentées dans ce module:
-- ADR-012: Exposition entités pour Lovelace (sensors comme entités HA)
-- ADR-014: Format des dates en fuseau local (dt_util.as_local())
-- ADR-027: Utilisation de CoordinatorEntity pour synchronisation automatique
-- ADR-030: Simplification avec SensorEntityDescription
-- ADR-052: Internationalisation native (translation_key au lieu de name)
+ADRs implemented in this module:
+- ADR-012: Expose entities for Lovelace (sensors as HA entities)
+- ADR-014: Format dates in local timezone (dt_util.as_local())
+- ADR-027: Use CoordinatorEntity for automatic synchronization
+- ADR-030: Simplification with SensorEntityDescription
+- ADR-052: Native internationalization (translation_key instead of name)
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ SENSOR_DESCRIPTIONS: tuple[SmartHRTSensorDescription, ...] = (
         icon="mdi:weather-windy",
         device_class=SensorDeviceClass.WIND_SPEED,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement="km/h",
+        native_unit_of_measurement=UnitOfSpeed.METERS_PER_SECOND,
         value_fn=lambda data: data.wind_speed_forecast_avg,
         round_digits=1,
     ),

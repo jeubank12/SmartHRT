@@ -1,10 +1,10 @@
 """Implements the SmartHRT number entities.
 
-ADR implémentées dans ce module:
-- ADR-006: Apprentissage continu (SmartHRTRelaxationNumber pour le facteur)
-- ADR-007: Compensation météo (RCth/RPth LW/HW pour interpolation vent)
-- ADR-012: Exposition entités pour Lovelace (numbers comme entités HA)
-- ADR-027: Utilisation de CoordinatorEntity pour synchronisation automatique
+ADRs implemented in this module:
+- ADR-006: Continuous learning (SmartHRTRelaxationNumber for the factor)
+- ADR-007: Weather compensation (RCth/RPth LW/HW for wind interpolation)
+- ADR-012: Expose entities for Lovelace (numbers as HA entities)
+- ADR-027: Use CoordinatorEntity for automatic synchronization
 """
 
 import logging
@@ -38,7 +38,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
-    """Configuration des entités number à partir de la configuration ConfigEntry"""
+    """Set up number entities from the ConfigEntry configuration."""
 
     _LOGGER.debug("Calling number async_setup_entry entry=%s", entry)
 
@@ -60,12 +60,12 @@ async def async_setup_entry(
 
 
 class SmartHRTBaseNumber(CoordinatorEntity[SmartHRTCoordinator], NumberEntity):
-    """Classe de base pour les number SmartHRT (ADR-027: CoordinatorEntity)."""
+    """Base class for SmartHRT number entities (ADR-027: CoordinatorEntity)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
-        """Initialisation de base"""
+        """Initialize the base number entity."""
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
@@ -74,7 +74,7 @@ class SmartHRTBaseNumber(CoordinatorEntity[SmartHRTCoordinator], NumberEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Retourne les informations du device"""
+        """Return device information."""
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, self._device_id)},
@@ -85,13 +85,13 @@ class SmartHRTBaseNumber(CoordinatorEntity[SmartHRTCoordinator], NumberEntity):
 
 
 class SmartHRTSetPointNumber(SmartHRTBaseNumber):
-    """Entité number pour la consigne de température (Set Point)"""
+    """Number entity for the temperature set point."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Consigne"
+        self._attr_name = "Set Point"
         self._attr_unique_id = f"{self._device_id}_setpoint"
         self._attr_native_min_value = DEFAULT_TSP_MIN
         self._attr_native_max_value = DEFAULT_TSP_MAX
@@ -108,13 +108,13 @@ class SmartHRTSetPointNumber(SmartHRTBaseNumber):
         return "mdi:thermometer"
 
     async def async_set_native_value(self, value: float) -> None:
-        """Mise à jour de la valeur de consigne"""
+        """Update the set point value."""
         _LOGGER.info("Set point changed to: %s", value)
         self.coordinator.set_tsp(value)
 
 
 class SmartHRTRCthNumber(SmartHRTBaseNumber):
-    """Entité number pour RCth"""
+    """Number entity for RCth (thermal cooling constant)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
@@ -142,7 +142,7 @@ class SmartHRTRCthNumber(SmartHRTBaseNumber):
 
 
 class SmartHRTRPthNumber(SmartHRTBaseNumber):
-    """Entité number pour RPth"""
+    """Number entity for RPth (thermal heating power constant)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
@@ -170,17 +170,17 @@ class SmartHRTRPthNumber(SmartHRTBaseNumber):
 
 
 class SmartHRTRCthLWNumber(SmartHRTBaseNumber):
-    """Entité number pour RCth low wind.
+    """Number entity for RCth low wind.
 
-    ADR-007: Compensation météo - coefficient de refroidissement par vent faible.
-    Utilisé pour l'interpolation linéaire selon la vitesse du vent.
+    ADR-007: Weather compensation - cooling coefficient for low wind.
+    Used for linear interpolation based on wind speed.
     """
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "RCth (vent faible)"
+        self._attr_name = "RCth (Low Wind)"
         self._attr_unique_id = f"{self._device_id}_rcth_lw"
         self._attr_native_min_value = DEFAULT_RCTH_MIN
         self._attr_native_max_value = DEFAULT_RCTH_MAX
@@ -202,13 +202,13 @@ class SmartHRTRCthLWNumber(SmartHRTBaseNumber):
 
 
 class SmartHRTRCthHWNumber(SmartHRTBaseNumber):
-    """Entité number pour RCth high wind"""
+    """Number entity for RCth high wind."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "RCth (vent fort)"
+        self._attr_name = "RCth (High Wind)"
         self._attr_unique_id = f"{self._device_id}_rcth_hw"
         self._attr_native_min_value = DEFAULT_RCTH_MIN
         self._attr_native_max_value = DEFAULT_RCTH_MAX
@@ -230,13 +230,13 @@ class SmartHRTRCthHWNumber(SmartHRTBaseNumber):
 
 
 class SmartHRTRPthLWNumber(SmartHRTBaseNumber):
-    """Entité number pour RPth low wind"""
+    """Number entity for RPth low wind."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "RPth (vent faible)"
+        self._attr_name = "RPth (Low Wind)"
         self._attr_unique_id = f"{self._device_id}_rpth_lw"
         self._attr_native_min_value = DEFAULT_RPTH_MIN
         self._attr_native_max_value = DEFAULT_RPTH_MAX
@@ -258,13 +258,13 @@ class SmartHRTRPthLWNumber(SmartHRTBaseNumber):
 
 
 class SmartHRTRPthHWNumber(SmartHRTBaseNumber):
-    """Entité number pour RPth high wind"""
+    """Number entity for RPth high wind."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "RPth (vent fort)"
+        self._attr_name = "RPth (High Wind)"
         self._attr_unique_id = f"{self._device_id}_rpth_hw"
         self._attr_native_min_value = DEFAULT_RPTH_MIN
         self._attr_native_max_value = DEFAULT_RPTH_MAX
@@ -286,17 +286,17 @@ class SmartHRTRPthHWNumber(SmartHRTBaseNumber):
 
 
 class SmartHRTRelaxationNumber(SmartHRTBaseNumber):
-    """Entité number pour le facteur de relaxation.
+    """Number entity for the relaxation factor.
 
-    ADR-006: Apprentissage continu - contrôle la vitesse de convergence.
-    Plus la valeur est élevée, plus l'apprentissage est lent mais stable.
+    ADR-006: Continuous learning - controls the convergence speed.
+    Higher values mean slower but more stable learning.
     """
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Facteur de relaxation"
+        self._attr_name = "Relaxation Factor"
         self._attr_unique_id = f"{self._device_id}_relaxation"
         self._attr_native_min_value = 0.0
         self._attr_native_max_value = 15.0

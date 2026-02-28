@@ -1,8 +1,8 @@
-"""Les constantes pour l'intégration SmartHRT.
+"""Constants for the SmartHRT integration.
 
-ADR implémentées dans ce module:
-- ADR-041: PERSISTED_FIELDS supprimé, remplacé par SmartHRTData.as_dict/from_dict
-- ADR-051: TimerKey pour la gestion centralisée des timers
+ADRs implemented in this module:
+- ADR-041: PERSISTED_FIELDS removed, replaced by SmartHRTData.as_dict/from_dict
+- ADR-051: TimerKey for centralized timer management
 """
 
 from enum import StrEnum
@@ -11,9 +11,9 @@ from homeassistant.const import Platform
 
 
 class TimerKey(StrEnum):
-    """Clés des timers gérés par le système (ADR-051).
+    """Keys for timers managed by the system (ADR-051).
 
-    Utilisées avec TimerManager pour identifier les timers de manière unique.
+    Used with TimerManager to uniquely identify timers.
     """
 
     RECOVERYCALC_HOUR = "recoverycalc_hour"
@@ -38,12 +38,24 @@ CONF_RECOVERYCALC_HOUR = "recoverycalc_hour"
 CONF_SENSOR_INTERIOR_TEMP = "sensor_interior_temperature"
 CONF_WEATHER_ENTITY = "weather_entity"
 CONF_TSP = "tsp"
+CONF_TEMP_UNIT = "temp_unit"  # UI temperature unit preference for config form
 
-# Default values
+# Temperature unit options for the config form
+TEMP_UNIT_CELSIUS = "°C"
+TEMP_UNIT_FAHRENHEIT = "°F"
+DEFAULT_TEMP_UNIT = TEMP_UNIT_CELSIUS
+
+# Default values (internal storage always in Celsius)
 DEFAULT_TSP = 19.0
 DEFAULT_TSP_MIN = 13.0
 DEFAULT_TSP_MAX = 26.0
 DEFAULT_TSP_STEP = 0.1
+
+# Equivalent Set Point limits in Fahrenheit for the config form
+DEFAULT_TSP_MIN_F = 55.0   # ≈ 13 °C
+DEFAULT_TSP_MAX_F = 79.0   # ≈ 26 °C
+DEFAULT_TSP_STEP_F = 0.5
+DEFAULT_TSP_F = 66.0       # ≈ 19 °C
 
 # Thermal coefficients defaults
 DEFAULT_RCTH = 50.0
@@ -54,8 +66,8 @@ DEFAULT_RPTH_MIN = 0.0
 DEFAULT_RPTH_MAX = 19999.0
 DEFAULT_RELAXATION_FACTOR = 2.0
 
-# ADR-007: Compensation météo - seuils de vent pour interpolation
-# WIND_LOW: vent faible (utilise rcth_lw), WIND_HIGH: vent fort (utilise rcth_hw)
+# ADR-007: Weather compensation - wind thresholds for interpolation
+# WIND_LOW: low wind (uses rcth_lw), WIND_HIGH: high wind (uses rcth_hw)
 WIND_HIGH = 60.0
 WIND_LOW = 10.0
 
@@ -80,13 +92,13 @@ SERVICE_TRIGGER_CALCULATION = "trigger_calculation"
 # Weather forecast settings
 FORECAST_HOURS = 3
 
-# ADR-008: Validation arrêt par détection lag
-# Seuil de baisse de température pour confirmer l'arrêt réel du chauffage
+# ADR-008: Stop validation via lag detection
+# Temperature drop threshold to confirm that heating has actually stopped
 TEMP_DECREASE_THRESHOLD = 0.2  # °C
 
 # Default recoverycalc hour (23:00)
 DEFAULT_RECOVERYCALC_HOUR = "23:00:00"
 
-# ADR-041: PERSISTED_FIELDS supprimé
-# La sérialisation est maintenant centralisée dans SmartHRTData.as_dict/from_dict
-# Voir coordinator.py pour _PERSISTENT_FIELDS et la logique de migration
+# ADR-041: PERSISTED_FIELDS removed
+# Serialization is now centralized in SmartHRTData.as_dict/from_dict
+# See coordinator.py for _PERSISTENT_FIELDS and the migration logic

@@ -1,10 +1,10 @@
-"""Le Config Flow pour SmartHRT.
+"""Config Flow for SmartHRT.
 
-ADR implémentées dans ce module:
-- ADR-002: Sélection explicite de l'entité météo (weather_entity selector)
-- ADR-010: Inputs dynamiques configurables (ConfigFlow multi-step)
-- ADR-011: Robustesse des calculs (validation des entrées)
-- ADR-032: Validation renforcée (existence entités, séquence horaires)
+ADRs implemented in this module:
+- ADR-002: Explicit weather entity selection (weather_entity selector)
+- ADR-010: Dynamic configurable inputs (multi-step ConfigFlow)
+- ADR-011: Calculation robustness (input validation)
+- ADR-032: Reinforced validation (entity existence, time sequence)
 """
 
 import logging
@@ -29,13 +29,58 @@ from .const import (
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
     CONF_TSP,
+    CONF_TEMP_UNIT,
+    TEMP_UNIT_CELSIUS,
+    TEMP_UNIT_FAHRENHEIT,
+    DEFAULT_TEMP_UNIT,
     DEFAULT_TSP,
     DEFAULT_TSP_MIN,
     DEFAULT_TSP_MAX,
     DEFAULT_TSP_STEP,
+    DEFAULT_TSP_F,
+    DEFAULT_TSP_MIN_F,
+    DEFAULT_TSP_MAX_F,
+    DEFAULT_TSP_STEP_F,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _build_tsp_selector(temp_unit: str) -> selector.NumberSelector:
+    """Build a NumberSelector for the Set Point in the given temperature unit."""
+    if temp_unit == TEMP_UNIT_FAHRENHEIT:
+        return selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=DEFAULT_TSP_MIN_F,
+                max=DEFAULT_TSP_MAX_F,
+                step=DEFAULT_TSP_STEP_F,
+                unit_of_measurement=TEMP_UNIT_FAHRENHEIT,
+                mode=selector.NumberSelectorMode.BOX,
+            )
+        )
+    return selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=DEFAULT_TSP_MIN,
+            max=DEFAULT_TSP_MAX,
+            step=DEFAULT_TSP_STEP,
+            unit_of_measurement=TEMP_UNIT_CELSIUS,
+            mode=selector.NumberSelectorMode.BOX,
+        )
+    )
+
+
+def _tsp_to_celsius(tsp: float, temp_unit: str) -> float:
+    """Convert a Set Point value to Celsius for internal storage."""
+    if temp_unit == TEMP_UNIT_FAHRENHEIT:
+        return (tsp - 32) * 5 / 9
+    return tsp
+
+
+def _tsp_from_celsius(tsp_celsius: float, temp_unit: str) -> float:
+    """Convert a stored Celsius Set Point to the display unit."""
+    if temp_unit == TEMP_UNIT_FAHRENHEIT:
+        return round(tsp_celsius * 9 / 5 + 32, 1)
+    return tsp_celsius
 
 
 def add_suggested_values_to_schema(
@@ -92,8 +137,7 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is None:
             _LOGGER.debug(
-                "config_flow step user (1). 1er appel : pas de user_input -> "
-                "on affiche le form user_form"
+                "config_flow step user (1). First call: no user_input -> showing user_form"
             )
             return self.async_show_form(
                 step_id="user",
@@ -102,72 +146,82 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                 ),
             )  # pyright: ignore[reportReturnType]
 
-        # 2ème appel : il y a des user_input -> on stocke le résultat
+        # Second call: user_input received -> store the result
         _LOGGER.debug(
-            "config_flow step user (2). On a reçu les valeurs: %s", user_input
+            "config_flow step user (2). Received values: %s", user_input
         )
-        # On mémorise les user_input
+        # Store user_input
         self._user_inputs.update(user_input)
 
-        # Vérifier les entrées dupliquées basées sur le nom
+        # Check for duplicate entries based on name
         await self.async_set_unique_id(user_input[CONF_NAME])
         self._abort_if_unique_id_configured()
 
-        # On appelle le step 2 (configuration des capteurs)
+        # Proceed to step 2 (sensor configuration)
         return await self.async_step_sensors()
 
     async def async_step_sensors(self, user_input: dict | None = None) -> FlowResult:
-        """Gestion de l'étape sensors. Configuration des capteurs et paramètres."""
+        """Handle the sensors step. Configure sensors and parameters."""
         errors: dict[str, str] = {}
+
+        # Determine the display unit for building the form schema
+        display_unit = (
+            user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+            if user_input is not None
+            else self._user_inputs.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        )
+        tsp_default = DEFAULT_TSP_F if display_unit == TEMP_UNIT_FAHRENHEIT else DEFAULT_TSP
 
         sensors_form = vol.Schema(
             {
-                # Heure cible (Wake Up Time)
                 vol.Required(CONF_TARGET_HOUR): selector.TimeSelector(),
-                # Heure de coupure chauffage (soir)
                 vol.Required(
                     CONF_RECOVERYCALC_HOUR, default="23:00:00"
                 ): selector.TimeSelector(),
-                # Capteur de température intérieure (ADR-010: inputs dynamiques)
                 vol.Required(CONF_SENSOR_INTERIOR_TEMP): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=SENSOR_DOMAIN),
                 ),
-                # ADR-002: Sélection explicite de l'entité météo
-                # L'utilisateur choisit son entité weather au lieu d'une auto-détection
+                # ADR-002: Explicit weather entity selection
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather"),
                 ),
-                # Consigne de température (Set Point)
-                vol.Required(CONF_TSP, default=DEFAULT_TSP): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=DEFAULT_TSP_MIN,
-                        max=DEFAULT_TSP_MAX,
-                        step=DEFAULT_TSP_STEP,
-                        unit_of_measurement="°C",
-                        mode=selector.NumberSelectorMode.BOX,
-                    ),
+                # Temperature unit preference for Set Point input
+                vol.Required(
+                    CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[TEMP_UNIT_CELSIUS, TEMP_UNIT_FAHRENHEIT],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
                 ),
+                # Set Point in the chosen unit (stored internally in Celsius)
+                vol.Required(CONF_TSP, default=tsp_default): _build_tsp_selector(display_unit),
             }
         )
 
         if user_input is None:
             _LOGGER.debug(
-                "config_flow step sensors (1). 1er appel : pas de user_input -> "
-                "on affiche le form sensors_form"
+                "config_flow step sensors (1). First call: no user_input -> showing sensors_form"
             )
+            # Convert stored Celsius TSP to display unit for pre-filling
+            suggested = dict(self._user_inputs)
+            if CONF_TSP in suggested:
+                suggested[CONF_TSP] = _tsp_from_celsius(suggested[CONF_TSP], display_unit)
             return self.async_show_form(
                 step_id="sensors",
                 data_schema=add_suggested_values_to_schema(
-                    data_schema=sensors_form, suggested_values=self._user_inputs
+                    data_schema=sensors_form, suggested_values=suggested
                 ),
             )  # pyright: ignore[reportReturnType]
 
-        # 2ème appel : il y a des user_input -> validation ADR-032
-        _LOGGER.debug(
-            "config_flow step sensors (2). On a reçu les valeurs: %s", user_input
-        )
+        # Second call: validate inputs (ADR-032)
+        _LOGGER.debug("config_flow step sensors (2). Received values: %s", user_input)
 
-        # ADR-032: Validation de l'entité météo
+        temp_unit = user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        tsp_raw = user_input.get(CONF_TSP, DEFAULT_TSP)
+        tsp_celsius = _tsp_to_celsius(tsp_raw, temp_unit)
+
+        # ADR-032: Validate weather entity
         weather_entity_id = user_input.get(CONF_WEATHER_ENTITY)
         if weather_entity_id:
             weather_state = self.hass.states.get(weather_entity_id)
@@ -176,28 +230,27 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
             elif not self._is_valid_weather_entity(weather_state):
                 errors[CONF_WEATHER_ENTITY] = "weather_incompatible"
 
-        # ADR-032: Validation du capteur de température
+        # ADR-032: Validate interior temperature sensor
         temp_sensor_id = user_input.get(CONF_SENSOR_INTERIOR_TEMP)
         if temp_sensor_id:
             temp_state = self.hass.states.get(temp_sensor_id)
             if temp_state is None:
                 errors[CONF_SENSOR_INTERIOR_TEMP] = "sensor_not_found"
 
-        # ADR-032: Validation TSP dans les limites
-        tsp = user_input.get(CONF_TSP, DEFAULT_TSP)
-        if not (DEFAULT_TSP_MIN <= tsp <= DEFAULT_TSP_MAX):
+        # ADR-032: Validate Set Point (always checked in Celsius)
+        if not (DEFAULT_TSP_MIN <= tsp_celsius <= DEFAULT_TSP_MAX):
             errors[CONF_TSP] = "tsp_out_of_range"
 
-        # ADR-032: Validation séquence horaires
+        # ADR-032: Validate time sequence
         target_hour = user_input.get(CONF_TARGET_HOUR)
         recoverycalc_hour = user_input.get(CONF_RECOVERYCALC_HOUR)
         if target_hour and recoverycalc_hour:
             if not self._validate_time_sequence(recoverycalc_hour, target_hour):
                 errors["base"] = "invalid_time_sequence"
 
-        # Si erreurs, réafficher le formulaire
+        # If errors, redisplay with original user values (TSP still in user's unit)
         if errors:
-            _LOGGER.debug("Erreurs de validation config_flow: %s", errors)
+            _LOGGER.debug("Config flow validation errors: %s", errors)
             return self.async_show_form(
                 step_id="sensors",
                 data_schema=add_suggested_values_to_schema(
@@ -206,10 +259,11 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors=errors,
             )  # pyright: ignore[reportReturnType]
 
-        # On mémorise les user_input
+        # Store TSP converted to Celsius; keep unit preference for options flow
+        user_input[CONF_TSP] = tsp_celsius
         self._user_inputs.update(user_input)
         _LOGGER.info(
-            "config_flow step sensors (2). L'ensemble de la configuration est: %s",
+            "config_flow step sensors (2). Full configuration: %s",
             self._user_inputs,
         )
 
@@ -218,29 +272,29 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
         )  # pyright: ignore[reportReturnType]
 
     def _is_valid_weather_entity(self, state) -> bool:
-        """Vérifie que l'entité météo est valide (ADR-032).
+        """Check that the weather entity is valid (ADR-032).
 
-        Une entité météo valide doit être du domaine 'weather' et
-        idéalement supporter les prévisions.
+        A valid weather entity must be in the 'weather' domain and
+        ideally support forecasts.
         """
         if state is None:
             return False
-        # Le domaine est vérifié par le selector, mais on vérifie quand même
+        # Domain is checked by the selector, but we verify anyway
         return state.domain == "weather"
 
     def _validate_time_sequence(self, recoverycalc: str, target: str) -> bool:
-        """Vérifie que recoverycalc_hour précède target_hour (ADR-032).
+        """Verify that recoverycalc_hour precedes target_hour (ADR-032).
 
-        La logique: recoverycalc (23:00) doit être le soir, target (06:00) le matin.
-        Si recoverycalc < target sur la même journée (ex: 05:00 et 08:00),
-        c'est probablement une erreur.
+        Logic: recoverycalc (23:00) should be in the evening, target (06:00) in the morning.
+        If recoverycalc < target on the same day (e.g. 05:00 and 08:00),
+        that is likely a configuration error.
 
         Args:
-            recoverycalc: Heure de coupure chauffage (format HH:MM:SS)
-            target: Heure cible réveil (format HH:MM:SS)
+            recoverycalc: Heating stop hour (HH:MM:SS format)
+            target: Wake-up target hour (HH:MM:SS format)
 
         Returns:
-            True si la séquence est valide, False sinon.
+            True if the sequence is valid, False otherwise.
         """
         try:
             rc_parts = recoverycalc.split(":")
@@ -252,121 +306,132 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                 tg_parts[1] if len(tg_parts) > 1 else 0
             )
 
-            # Cas valides:
-            # 1. recoverycalc (23:00) > target (06:00) - passage à minuit implicite
-            # 2. target est tôt le matin (avant midi) - toujours OK
+            # Valid cases:
+            # 1. recoverycalc (23:00) > target (06:00) - implicit midnight crossing
+            # 2. target is early morning (before noon) - always OK
             if rc_minutes > tg_minutes:
-                return True  # Passage à minuit
+                return True  # Midnight crossing
             if tg_minutes < 12 * 60:
-                return True  # Target le matin
+                return True  # Target in the morning
 
-            # Cas invalide: recoverycalc et target dans l'après-midi, rc < tg
+            # Invalid: recoverycalc and target both in the afternoon, rc < tg
             return False
         except (ValueError, IndexError):
-            return True  # En cas d'erreur de parsing, on laisse passer
+            return True  # On parsing error, allow through
 
 
-# Clés stockées dans 'data' (configuration statique - ne change pas)
+# Keys stored in 'data' (static configuration - does not change)
 STATIC_KEYS = {
     CONF_NAME,
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
 }
-# Clés stockées dans 'options' (réglages dynamiques - modifiables sans rechargement)
-DYNAMIC_KEYS = {CONF_TARGET_HOUR, CONF_RECOVERYCALC_HOUR, CONF_TSP}
+# Keys stored in 'options' (dynamic settings - modifiable without reload)
+DYNAMIC_KEYS = {CONF_TARGET_HOUR, CONF_RECOVERYCALC_HOUR, CONF_TSP, CONF_TEMP_UNIT}
 
 
 class SmartHRTOptionsFlow(OptionsFlow):
-    """La classe qui implémente le option flow pour SmartHRT.
-    Elle doit dériver de OptionsFlow.
+    """Implements the options flow for SmartHRT.
+    Must derive from OptionsFlow.
 
-    Les réglages dynamiques sont stockés dans 'options' pour permettre
-    leur modification sans rechargement complet de l'intégration.
+    Dynamic settings are stored in 'options' to allow
+    modification without a full integration reload.
     """
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialisation de l'option flow. On a le ConfigEntry existant en entrée"""
+        """Initialize the options flow with the existing ConfigEntry."""
         super().__init__()
         self._config_entry = config_entry
-        # On initialise les user_inputs en fusionnant data et options
-        # options a priorité sur data pour les clés dynamiques
+        # Initialize user_inputs by merging data and options;
+        # options take priority over data for dynamic keys
         self._user_inputs: dict[str, Any] = {
             **config_entry.data,
             **config_entry.options,
         }
 
     async def async_step_init(self, user_input: dict | None = None) -> FlowResult:
-        """Gestion de l'étape 'init'. Point d'entrée du optionsFlow."""
+        """Handle the 'init' step. Entry point of the options flow."""
+        # Determine display unit (from submitted input or stored preference)
+        display_unit = (
+            user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+            if user_input is not None
+            else self._user_inputs.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        )
+        tsp_default = DEFAULT_TSP_F if display_unit == TEMP_UNIT_FAHRENHEIT else DEFAULT_TSP
+
         option_form = vol.Schema(
             {
                 vol.Required(CONF_NAME): str,
-                # Heure cible (Wake Up Time)
                 vol.Required(CONF_TARGET_HOUR): selector.TimeSelector(),
-                # Heure de coupure chauffage (soir)
                 vol.Required(
                     CONF_RECOVERYCALC_HOUR, default="23:00:00"
                 ): selector.TimeSelector(),
-                # Capteur de température intérieure (ADR-010: inputs dynamiques)
                 vol.Required(CONF_SENSOR_INTERIOR_TEMP): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=SENSOR_DOMAIN)
                 ),
-                # ADR-002: Sélection explicite de l'entité météo
+                # ADR-002: Explicit weather entity selection
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather")
                 ),
-                # Consigne de température (Set Point)
-                vol.Required(CONF_TSP, default=DEFAULT_TSP): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=DEFAULT_TSP_MIN,
-                        max=DEFAULT_TSP_MAX,
-                        step=DEFAULT_TSP_STEP,
-                        unit_of_measurement="°C",
-                        mode=selector.NumberSelectorMode.BOX,
-                    ),
+                # Temperature unit preference for Set Point input
+                vol.Required(
+                    CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[TEMP_UNIT_CELSIUS, TEMP_UNIT_FAHRENHEIT],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
                 ),
+                # Set Point in the chosen unit (stored internally in Celsius)
+                vol.Required(CONF_TSP, default=tsp_default): _build_tsp_selector(display_unit),
             }
         )
 
         if user_input is None:
             _LOGGER.debug(
-                "option_flow step user (1). 1er appel : pas de user_input -> "
-                "on affiche le form user_form"
+                "option_flow step user (1). First call: no user_input -> showing option_form"
             )
+            # Convert stored Celsius TSP to display unit for pre-filling
+            suggested = dict(self._user_inputs)
+            if CONF_TSP in suggested:
+                suggested[CONF_TSP] = _tsp_from_celsius(suggested[CONF_TSP], display_unit)
             return self.async_show_form(
                 step_id="init",
                 data_schema=add_suggested_values_to_schema(
-                    data_schema=option_form, suggested_values=self._user_inputs
+                    data_schema=option_form, suggested_values=suggested
                 ),
             )  # pyright: ignore[reportReturnType]
 
-        # 2ème appel : il y a des user_input -> on stocke le résultat
+        # Second call: user_input received -> convert TSP and store
         _LOGGER.debug(
-            "option_flow step user (2). On a reçu les valeurs: %s", user_input
+            "option_flow step user (2). Received values: %s", user_input
         )
-        # On mémorise les user_input
+        temp_unit = user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        tsp_raw = user_input.get(CONF_TSP, DEFAULT_TSP)
+        user_input[CONF_TSP] = _tsp_to_celsius(tsp_raw, temp_unit)
         self._user_inputs.update(user_input)
 
-        # On appelle le step de fin pour enregistrer les modifications
+        # Proceed to finalization
         return await self.async_end()  # pyright: ignore[reportReturnType]
 
     async def async_end(self) -> FlowResult:
-        """Finalization of the ConfigEntry modification.
+        """Finalize the ConfigEntry modification.
 
-        Sépare les données en:
-        - data: configuration statique (capteurs, nom, météo)
-        - options: réglages dynamiques (heures, consigne)
+        Splits data into:
+        - data: static configuration (sensors, name, weather)
+        - options: dynamic settings (times, set point)
 
-        Les données statiques nécessitent un rechargement de l'intégration.
-        Les options dynamiques peuvent être appliquées sans rechargement.
+        Static data requires an integration reload.
+        Dynamic options can be applied without a reload.
         """
-        # Extraire les données statiques (nécessite rechargement)
+        # Extract static data (requires reload)
         new_data = {
             key: self._user_inputs[key]
             for key in STATIC_KEYS
             if key in self._user_inputs
         }
 
-        # Extraire les options dynamiques
+        # Extract dynamic options
         new_options = {
             key: self._user_inputs[key]
             for key in DYNAMIC_KEYS
@@ -374,19 +439,19 @@ class SmartHRTOptionsFlow(OptionsFlow):
         }
 
         _LOGGER.info(
-            "Mise à jour de l'entry %s. Nouvelles data: %s, Nouvelles options: %s",
+            "Updating entry %s. New data: %s, New options: %s",
             self._config_entry.entry_id,
             new_data,
             new_options,
         )
 
-        # Mettre à jour les données statiques si elles ont changé
+        # Update static data if changed
         if new_data != dict(self._config_entry.data):
             self.hass.config_entries.async_update_entry(
                 self._config_entry,
                 data=new_data,
             )
-            _LOGGER.info("Données statiques mises à jour, rechargement nécessaire")
+            _LOGGER.info("Static data updated, integration reload required")
 
         # Retourne les nouvelles options - Home Assistant les stockera automatiquement
         # dans config_entry.options et déclenchera update_listener
