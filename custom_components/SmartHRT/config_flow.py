@@ -29,13 +29,58 @@ from .const import (
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
     CONF_TSP,
+    CONF_TEMP_UNIT,
+    TEMP_UNIT_CELSIUS,
+    TEMP_UNIT_FAHRENHEIT,
+    DEFAULT_TEMP_UNIT,
     DEFAULT_TSP,
     DEFAULT_TSP_MIN,
     DEFAULT_TSP_MAX,
     DEFAULT_TSP_STEP,
+    DEFAULT_TSP_F,
+    DEFAULT_TSP_MIN_F,
+    DEFAULT_TSP_MAX_F,
+    DEFAULT_TSP_STEP_F,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _build_tsp_selector(temp_unit: str) -> selector.NumberSelector:
+    """Build a NumberSelector for the Set Point in the given temperature unit."""
+    if temp_unit == TEMP_UNIT_FAHRENHEIT:
+        return selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=DEFAULT_TSP_MIN_F,
+                max=DEFAULT_TSP_MAX_F,
+                step=DEFAULT_TSP_STEP_F,
+                unit_of_measurement=TEMP_UNIT_FAHRENHEIT,
+                mode=selector.NumberSelectorMode.BOX,
+            )
+        )
+    return selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=DEFAULT_TSP_MIN,
+            max=DEFAULT_TSP_MAX,
+            step=DEFAULT_TSP_STEP,
+            unit_of_measurement=TEMP_UNIT_CELSIUS,
+            mode=selector.NumberSelectorMode.BOX,
+        )
+    )
+
+
+def _tsp_to_celsius(tsp: float, temp_unit: str) -> float:
+    """Convert a Set Point value to Celsius for internal storage."""
+    if temp_unit == TEMP_UNIT_FAHRENHEIT:
+        return (tsp - 32) * 5 / 9
+    return tsp
+
+
+def _tsp_from_celsius(tsp_celsius: float, temp_unit: str) -> float:
+    """Convert a stored Celsius Set Point to the display unit."""
+    if temp_unit == TEMP_UNIT_FAHRENHEIT:
+        return round(tsp_celsius * 9 / 5 + 32, 1)
+    return tsp_celsius
 
 
 def add_suggested_values_to_schema(
@@ -119,33 +164,38 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the sensors step. Configure sensors and parameters."""
         errors: dict[str, str] = {}
 
+        # Determine the display unit for building the form schema
+        display_unit = (
+            user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+            if user_input is not None
+            else self._user_inputs.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        )
+        tsp_default = DEFAULT_TSP_F if display_unit == TEMP_UNIT_FAHRENHEIT else DEFAULT_TSP
+
         sensors_form = vol.Schema(
             {
-                # Heure cible (Wake Up Time)
                 vol.Required(CONF_TARGET_HOUR): selector.TimeSelector(),
-                # Heure de coupure chauffage (soir)
                 vol.Required(
                     CONF_RECOVERYCALC_HOUR, default="23:00:00"
                 ): selector.TimeSelector(),
-                # Capteur de température intérieure (ADR-010: inputs dynamiques)
                 vol.Required(CONF_SENSOR_INTERIOR_TEMP): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=SENSOR_DOMAIN),
                 ),
-                # ADR-002: Sélection explicite de l'entité météo
-                # L'utilisateur choisit son entité weather au lieu d'une auto-détection
+                # ADR-002: Explicit weather entity selection
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather"),
                 ),
-                # Consigne de température (Set Point)
-                vol.Required(CONF_TSP, default=DEFAULT_TSP): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=DEFAULT_TSP_MIN,
-                        max=DEFAULT_TSP_MAX,
-                        step=DEFAULT_TSP_STEP,
-                        unit_of_measurement="°C",
-                        mode=selector.NumberSelectorMode.BOX,
-                    ),
+                # Temperature unit preference for Set Point input
+                vol.Required(
+                    CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[TEMP_UNIT_CELSIUS, TEMP_UNIT_FAHRENHEIT],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
                 ),
+                # Set Point in the chosen unit (stored internally in Celsius)
+                vol.Required(CONF_TSP, default=tsp_default): _build_tsp_selector(display_unit),
             }
         )
 
@@ -153,19 +203,25 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
             _LOGGER.debug(
                 "config_flow step sensors (1). First call: no user_input -> showing sensors_form"
             )
+            # Convert stored Celsius TSP to display unit for pre-filling
+            suggested = dict(self._user_inputs)
+            if CONF_TSP in suggested:
+                suggested[CONF_TSP] = _tsp_from_celsius(suggested[CONF_TSP], display_unit)
             return self.async_show_form(
                 step_id="sensors",
                 data_schema=add_suggested_values_to_schema(
-                    data_schema=sensors_form, suggested_values=self._user_inputs
+                    data_schema=sensors_form, suggested_values=suggested
                 ),
             )  # pyright: ignore[reportReturnType]
 
-        # 2ème appel : il y a des user_input -> validation ADR-032
-        _LOGGER.debug(
-            "config_flow step sensors (2). On a reçu les valeurs: %s", user_input
-        )
+        # Second call: validate inputs (ADR-032)
+        _LOGGER.debug("config_flow step sensors (2). Received values: %s", user_input)
 
-        # ADR-032: Validation de l'entité météo
+        temp_unit = user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        tsp_raw = user_input.get(CONF_TSP, DEFAULT_TSP)
+        tsp_celsius = _tsp_to_celsius(tsp_raw, temp_unit)
+
+        # ADR-032: Validate weather entity
         weather_entity_id = user_input.get(CONF_WEATHER_ENTITY)
         if weather_entity_id:
             weather_state = self.hass.states.get(weather_entity_id)
@@ -174,26 +230,25 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
             elif not self._is_valid_weather_entity(weather_state):
                 errors[CONF_WEATHER_ENTITY] = "weather_incompatible"
 
-        # ADR-032: Validation du capteur de température
+        # ADR-032: Validate interior temperature sensor
         temp_sensor_id = user_input.get(CONF_SENSOR_INTERIOR_TEMP)
         if temp_sensor_id:
             temp_state = self.hass.states.get(temp_sensor_id)
             if temp_state is None:
                 errors[CONF_SENSOR_INTERIOR_TEMP] = "sensor_not_found"
 
-        # ADR-032: Validation TSP dans les limites
-        tsp = user_input.get(CONF_TSP, DEFAULT_TSP)
-        if not (DEFAULT_TSP_MIN <= tsp <= DEFAULT_TSP_MAX):
+        # ADR-032: Validate Set Point (always checked in Celsius)
+        if not (DEFAULT_TSP_MIN <= tsp_celsius <= DEFAULT_TSP_MAX):
             errors[CONF_TSP] = "tsp_out_of_range"
 
-        # ADR-032: Validation séquence horaires
+        # ADR-032: Validate time sequence
         target_hour = user_input.get(CONF_TARGET_HOUR)
         recoverycalc_hour = user_input.get(CONF_RECOVERYCALC_HOUR)
         if target_hour and recoverycalc_hour:
             if not self._validate_time_sequence(recoverycalc_hour, target_hour):
                 errors["base"] = "invalid_time_sequence"
 
-        # If errors, redisplay the form
+        # If errors, redisplay with original user values (TSP still in user's unit)
         if errors:
             _LOGGER.debug("Config flow validation errors: %s", errors)
             return self.async_show_form(
@@ -204,7 +259,8 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors=errors,
             )  # pyright: ignore[reportReturnType]
 
-        # Store user_input
+        # Store TSP converted to Celsius; keep unit preference for options flow
+        user_input[CONF_TSP] = tsp_celsius
         self._user_inputs.update(user_input)
         _LOGGER.info(
             "config_flow step sensors (2). Full configuration: %s",
@@ -271,7 +327,7 @@ STATIC_KEYS = {
     CONF_WEATHER_ENTITY,
 }
 # Keys stored in 'options' (dynamic settings - modifiable without reload)
-DYNAMIC_KEYS = {CONF_TARGET_HOUR, CONF_RECOVERYCALC_HOUR, CONF_TSP}
+DYNAMIC_KEYS = {CONF_TARGET_HOUR, CONF_RECOVERYCALC_HOUR, CONF_TSP, CONF_TEMP_UNIT}
 
 
 class SmartHRTOptionsFlow(OptionsFlow):
@@ -295,33 +351,39 @@ class SmartHRTOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict | None = None) -> FlowResult:
         """Handle the 'init' step. Entry point of the options flow."""
+        # Determine display unit (from submitted input or stored preference)
+        display_unit = (
+            user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+            if user_input is not None
+            else self._user_inputs.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        )
+        tsp_default = DEFAULT_TSP_F if display_unit == TEMP_UNIT_FAHRENHEIT else DEFAULT_TSP
+
         option_form = vol.Schema(
             {
                 vol.Required(CONF_NAME): str,
-                # Heure cible (Wake Up Time)
                 vol.Required(CONF_TARGET_HOUR): selector.TimeSelector(),
-                # Heure de coupure chauffage (soir)
                 vol.Required(
                     CONF_RECOVERYCALC_HOUR, default="23:00:00"
                 ): selector.TimeSelector(),
-                # Capteur de température intérieure (ADR-010: inputs dynamiques)
                 vol.Required(CONF_SENSOR_INTERIOR_TEMP): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=SENSOR_DOMAIN)
                 ),
-                # ADR-002: Sélection explicite de l'entité météo
+                # ADR-002: Explicit weather entity selection
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather")
                 ),
-                # Consigne de température (Set Point)
-                vol.Required(CONF_TSP, default=DEFAULT_TSP): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=DEFAULT_TSP_MIN,
-                        max=DEFAULT_TSP_MAX,
-                        step=DEFAULT_TSP_STEP,
-                        unit_of_measurement="°C",
-                        mode=selector.NumberSelectorMode.BOX,
-                    ),
+                # Temperature unit preference for Set Point input
+                vol.Required(
+                    CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[TEMP_UNIT_CELSIUS, TEMP_UNIT_FAHRENHEIT],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
                 ),
+                # Set Point in the chosen unit (stored internally in Celsius)
+                vol.Required(CONF_TSP, default=tsp_default): _build_tsp_selector(display_unit),
             }
         )
 
@@ -329,18 +391,24 @@ class SmartHRTOptionsFlow(OptionsFlow):
             _LOGGER.debug(
                 "option_flow step user (1). First call: no user_input -> showing option_form"
             )
+            # Convert stored Celsius TSP to display unit for pre-filling
+            suggested = dict(self._user_inputs)
+            if CONF_TSP in suggested:
+                suggested[CONF_TSP] = _tsp_from_celsius(suggested[CONF_TSP], display_unit)
             return self.async_show_form(
                 step_id="init",
                 data_schema=add_suggested_values_to_schema(
-                    data_schema=option_form, suggested_values=self._user_inputs
+                    data_schema=option_form, suggested_values=suggested
                 ),
             )  # pyright: ignore[reportReturnType]
 
-        # Second call: user_input received -> store the result
+        # Second call: user_input received -> convert TSP and store
         _LOGGER.debug(
             "option_flow step user (2). Received values: %s", user_input
         )
-        # Store user_input
+        temp_unit = user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
+        tsp_raw = user_input.get(CONF_TSP, DEFAULT_TSP)
+        user_input[CONF_TSP] = _tsp_to_celsius(tsp_raw, temp_unit)
         self._user_inputs.update(user_input)
 
         # Proceed to finalization
