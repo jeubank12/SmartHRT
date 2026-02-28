@@ -28,6 +28,8 @@ from .const import (
     CONF_RECOVERYCALC_HOUR,
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
+    CONF_SENSOR_OUTDOOR_TEMP,
+    CONF_SENSOR_WIND_SPEED,
     CONF_TSP,
     CONF_TEMP_UNIT,
     TEMP_UNIT_CELSIUS,
@@ -47,12 +49,18 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _build_tsp_selector(temp_unit: str) -> selector.NumberSelector:
-    """Build a NumberSelector for the Set Point in the given temperature unit."""
+    """Build a NumberSelector for the Set Point in the given temperature unit.
+
+    min/max are intentionally omitted so the frontend never rejects a value
+    before our Python handler runs.  This is necessary because HA stores the
+    schema from the *previous* render: if the user switches from °C to °F and
+    immediately submits, the browser would otherwise validate 64 °F against the
+    old max=26 °C limit and show "Value 64.0 is too large" before Python can
+    convert and accept it.  All range validation happens in the step handler.
+    """
     if temp_unit == TEMP_UNIT_FAHRENHEIT:
         return selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=DEFAULT_TSP_MIN_F,
-                max=DEFAULT_TSP_MAX_F,
                 step=DEFAULT_TSP_STEP_F,
                 unit_of_measurement=TEMP_UNIT_FAHRENHEIT,
                 mode=selector.NumberSelectorMode.BOX,
@@ -60,13 +68,18 @@ def _build_tsp_selector(temp_unit: str) -> selector.NumberSelector:
         )
     return selector.NumberSelector(
         selector.NumberSelectorConfig(
-            min=DEFAULT_TSP_MIN,
-            max=DEFAULT_TSP_MAX,
             step=DEFAULT_TSP_STEP,
             unit_of_measurement=TEMP_UNIT_CELSIUS,
             mode=selector.NumberSelectorMode.BOX,
         )
     )
+
+
+def _tsp_range_str(temp_unit: str) -> str:
+    """Return the valid TSP range as a human-readable string for the given unit."""
+    if temp_unit == TEMP_UNIT_FAHRENHEIT:
+        return f"{DEFAULT_TSP_MIN_F:.0f}–{DEFAULT_TSP_MAX_F:.0f} °F"
+    return f"{DEFAULT_TSP_MIN:.0f}–{DEFAULT_TSP_MAX:.0f} °C"
 
 
 def _tsp_to_celsius(tsp: float, temp_unit: str) -> float:
@@ -185,6 +198,13 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather"),
                 ),
+                # Optional sensor overrides for current conditions
+                vol.Optional(CONF_SENSOR_OUTDOOR_TEMP): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN),
+                ),
+                vol.Optional(CONF_SENSOR_WIND_SPEED): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN),
+                ),
                 # Temperature unit preference for Set Point input
                 vol.Required(
                     CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
@@ -212,6 +232,7 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                 data_schema=add_suggested_values_to_schema(
                     data_schema=sensors_form, suggested_values=suggested
                 ),
+                description_placeholders={"tsp_range": _tsp_range_str(display_unit)},
             )  # pyright: ignore[reportReturnType]
 
         # Second call: validate inputs (ADR-032)
@@ -237,9 +258,20 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
             if temp_state is None:
                 errors[CONF_SENSOR_INTERIOR_TEMP] = "sensor_not_found"
 
+        # Validate optional sensor overrides (if provided)
+        outdoor_temp_sensor = user_input.get(CONF_SENSOR_OUTDOOR_TEMP)
+        if outdoor_temp_sensor and self.hass.states.get(outdoor_temp_sensor) is None:
+            errors[CONF_SENSOR_OUTDOOR_TEMP] = "sensor_not_found"
+
+        wind_sensor = user_input.get(CONF_SENSOR_WIND_SPEED)
+        if wind_sensor and self.hass.states.get(wind_sensor) is None:
+            errors[CONF_SENSOR_WIND_SPEED] = "sensor_not_found"
+
         # ADR-032: Validate Set Point (always checked in Celsius)
         if not (DEFAULT_TSP_MIN <= tsp_celsius <= DEFAULT_TSP_MAX):
-            errors[CONF_TSP] = "tsp_out_of_range"
+            errors[CONF_TSP] = (
+                "tsp_out_of_range_f" if temp_unit == TEMP_UNIT_FAHRENHEIT else "tsp_out_of_range"
+            )
 
         # ADR-032: Validate time sequence
         target_hour = user_input.get(CONF_TARGET_HOUR)
@@ -257,6 +289,7 @@ class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
                     data_schema=sensors_form, suggested_values=user_input
                 ),
                 errors=errors,
+                description_placeholders={"tsp_range": _tsp_range_str(temp_unit)},
             )  # pyright: ignore[reportReturnType]
 
         # Store TSP converted to Celsius; keep unit preference for options flow
@@ -325,6 +358,8 @@ STATIC_KEYS = {
     CONF_NAME,
     CONF_SENSOR_INTERIOR_TEMP,
     CONF_WEATHER_ENTITY,
+    CONF_SENSOR_OUTDOOR_TEMP,
+    CONF_SENSOR_WIND_SPEED,
 }
 # Keys stored in 'options' (dynamic settings - modifiable without reload)
 DYNAMIC_KEYS = {CONF_TARGET_HOUR, CONF_RECOVERYCALC_HOUR, CONF_TSP, CONF_TEMP_UNIT}
@@ -373,6 +408,13 @@ class SmartHRTOptionsFlow(OptionsFlow):
                 vol.Required(CONF_WEATHER_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather")
                 ),
+                # Optional sensor overrides for current conditions
+                vol.Optional(CONF_SENSOR_OUTDOOR_TEMP): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN)
+                ),
+                vol.Optional(CONF_SENSOR_WIND_SPEED): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=SENSOR_DOMAIN)
+                ),
                 # Temperature unit preference for Set Point input
                 vol.Required(
                     CONF_TEMP_UNIT, default=DEFAULT_TEMP_UNIT
@@ -400,15 +442,43 @@ class SmartHRTOptionsFlow(OptionsFlow):
                 data_schema=add_suggested_values_to_schema(
                     data_schema=option_form, suggested_values=suggested
                 ),
+                description_placeholders={"tsp_range": _tsp_range_str(display_unit)},
             )  # pyright: ignore[reportReturnType]
 
-        # Second call: user_input received -> convert TSP and store
+        # Second call: user_input received -> validate and convert TSP
         _LOGGER.debug(
             "option_flow step user (2). Received values: %s", user_input
         )
+        errors: dict[str, str] = {}
         temp_unit = user_input.get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)
         tsp_raw = user_input.get(CONF_TSP, DEFAULT_TSP)
-        user_input[CONF_TSP] = _tsp_to_celsius(tsp_raw, temp_unit)
+        tsp_celsius = _tsp_to_celsius(tsp_raw, temp_unit)
+
+        if not (DEFAULT_TSP_MIN <= tsp_celsius <= DEFAULT_TSP_MAX):
+            errors[CONF_TSP] = (
+                "tsp_out_of_range_f" if temp_unit == TEMP_UNIT_FAHRENHEIT else "tsp_out_of_range"
+            )
+
+        outdoor_temp_sensor = user_input.get(CONF_SENSOR_OUTDOOR_TEMP)
+        if outdoor_temp_sensor and self.hass.states.get(outdoor_temp_sensor) is None:
+            errors[CONF_SENSOR_OUTDOOR_TEMP] = "sensor_not_found"
+
+        wind_sensor = user_input.get(CONF_SENSOR_WIND_SPEED)
+        if wind_sensor and self.hass.states.get(wind_sensor) is None:
+            errors[CONF_SENSOR_WIND_SPEED] = "sensor_not_found"
+
+        if errors:
+            _LOGGER.debug("Options flow validation errors: %s", errors)
+            return self.async_show_form(
+                step_id="init",
+                data_schema=add_suggested_values_to_schema(
+                    data_schema=option_form, suggested_values=user_input
+                ),
+                errors=errors,
+                description_placeholders={"tsp_range": _tsp_range_str(temp_unit)},
+            )  # pyright: ignore[reportReturnType]
+
+        user_input[CONF_TSP] = tsp_celsius
         self._user_inputs.update(user_input)
 
         # Proceed to finalization
