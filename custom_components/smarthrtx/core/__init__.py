@@ -1,4 +1,4 @@
-"""Module core SmartHRT - Modèle thermique Pure Python.
+"""Module core SmartHRTX - Modèle thermique Pure Python.
 
 Ce module implémente ADR-026: Extraction du modèle thermique en Pure Python.
 

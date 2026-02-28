@@ -1,11 +1,11 @@
 {
-  "title": "SmartHRT",
+  "title": "SmartHRTX",
   "config": {
-    "flow_title": "SmartHRT Konfiguration",
+    "flow_title": "SmartHRTX Konfiguration",
     "step": {
       "user": {
         "title": "Identifikation",
-        "description": "Konfigurieren Sie Ihre SmartHRT-Integration",
+        "description": "Konfigurieren Sie Ihre SmartHRTX-Integration",
         "data": {
           "name": "Name"
         },
@@ -32,10 +32,10 @@
     }
   },
   "options": {
-    "flow_title": "SmartHRT Optionen",
+    "flow_title": "SmartHRTX Optionen",
     "step": {
       "init": {
-        "title": "SmartHRT Konfiguration",
+        "title": "SmartHRTX Konfiguration",
         "description": "Ändern Sie die Konfiguration Ihrer intelligenten Heizung",
         "data": {
           "name": "Name",

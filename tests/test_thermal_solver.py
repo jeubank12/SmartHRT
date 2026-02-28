@@ -7,8 +7,8 @@ sans aucune dépendance à Home Assistant, avec des données synthétiques.
 import pytest
 from datetime import datetime, time as dt_time, timedelta
 
-from custom_components.SmartHRT.core.thermal import ThermalSolver
-from custom_components.SmartHRT.core.types import (
+from custom_components.smarthrtx.core.thermal import ThermalSolver
+from custom_components.smarthrtx.core.types import (
     ThermalConfig,
     ThermalCoefficients,
     ThermalState,

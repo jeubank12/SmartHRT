@@ -1,4 +1,4 @@
-"""Implements the SmartHRT number entities.
+"""Implements the SmartHRTX number entities.
 
 ADRs implemented in this module:
 - ADR-006: Continuous learning (SmartHRTRelaxationNumber for the factor)
@@ -60,7 +60,7 @@ async def async_setup_entry(
 
 
 class SmartHRTBaseNumber(CoordinatorEntity[SmartHRTCoordinator], NumberEntity):
-    """Base class for SmartHRT number entities (ADR-027: CoordinatorEntity)."""
+    """Base class for SmartHRTX number entities (ADR-027: CoordinatorEntity)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
@@ -69,7 +69,7 @@ class SmartHRTBaseNumber(CoordinatorEntity[SmartHRTCoordinator], NumberEntity):
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
-        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRT")
+        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRTX")
         self._attr_has_entity_name = True
 
     @property

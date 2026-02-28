@@ -1,4 +1,4 @@
-"""Tests pour la cohérence et le bon fonctionnement des services SmartHRT.
+"""Tests pour la cohérence et le bon fonctionnement des services SmartHRTX.
 
 Ce module vérifie que :
 1. Tous les services sont correctement définis dans const.py
@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from custom_components.SmartHRT.const import (
+from custom_components.smarthrtx.const import (
     DOMAIN,
     SERVICE_START_HEATING_CYCLE,
     SERVICE_STOP_HEATING,
@@ -24,7 +24,7 @@ from custom_components.SmartHRT.const import (
     SERVICE_RESET_LEARNING,
     SERVICE_TRIGGER_CALCULATION,
 )
-from custom_components.SmartHRT.coordinator import SmartHRTState
+from custom_components.smarthrtx.coordinator import SmartHRTState
 
 
 # Liste de tous les services attendus (ADR-043: Services essentiels uniquement)
@@ -51,12 +51,12 @@ class TestServicesConsistency:
 
     def test_services_yaml_exists(self):
         """Vérifie que services.yaml existe."""
-        services_yaml_path = Path("custom_components/SmartHRT/services.yaml")
+        services_yaml_path = Path("custom_components/SmartHRTX/services.yaml")
         assert services_yaml_path.exists(), "services.yaml non trouvé"
 
     def test_all_services_in_yaml(self):
         """Vérifie que tous les services sont définis dans services.yaml."""
-        services_yaml_path = Path("custom_components/SmartHRT/services.yaml")
+        services_yaml_path = Path("custom_components/SmartHRTX/services.yaml")
 
         if not services_yaml_path.exists():
             pytest.skip("services.yaml non trouvé")
@@ -74,7 +74,7 @@ class TestServicesConsistency:
 
     def test_no_extra_services_in_yaml(self):
         """Vérifie qu'il n'y a pas de services orphelins dans services.yaml."""
-        services_yaml_path = Path("custom_components/SmartHRT/services.yaml")
+        services_yaml_path = Path("custom_components/SmartHRTX/services.yaml")
 
         if not services_yaml_path.exists():
             pytest.skip("services.yaml non trouvé")
@@ -92,7 +92,7 @@ class TestServicesConsistency:
 
     def test_services_py_imports_all_from_const(self):
         """Vérifie que services.py importe tous les services depuis const.py."""
-        services_py_path = Path("custom_components/SmartHRT/services.py")
+        services_py_path = Path("custom_components/SmartHRTX/services.py")
 
         if not services_py_path.exists():
             pytest.skip("services.py non trouvé")
@@ -116,7 +116,7 @@ class TestServicesHandlers:
     @pytest.mark.asyncio
     async def test_stop_heating_handler_uses_async_method(self, create_coordinator):
         """Vérifie que stop_heating appelle la méthode async correcte."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 8, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -135,7 +135,7 @@ class TestServicesHandlers:
     @pytest.mark.asyncio
     async def test_start_recovery_handler(self, create_coordinator):
         """Vérifie que start_recovery fonctionne correctement."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 16, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -156,7 +156,7 @@ class TestServicesHandlers:
     @pytest.mark.asyncio
     async def test_end_recovery_handler(self, create_coordinator):
         """Vérifie que end_recovery fonctionne correctement."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 6, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -179,7 +179,7 @@ class TestServicesHandlers:
     @pytest.mark.asyncio
     async def test_get_state_returns_all_fields(self, create_coordinator):
         """Vérifie que get_state retourne tous les champs attendus."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 10, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -212,7 +212,7 @@ class TestServiceYamlStructure:
 
     def test_all_services_have_name_and_description(self):
         """Vérifie que tous les services ont un nom et une description."""
-        services_yaml_path = Path("custom_components/SmartHRT/services.yaml")
+        services_yaml_path = Path("custom_components/SmartHRTX/services.yaml")
 
         if not services_yaml_path.exists():
             pytest.skip("services.yaml non trouvé")
@@ -228,7 +228,7 @@ class TestServiceYamlStructure:
 
     def test_all_services_have_entry_id_field(self):
         """Vérifie que tous les services ont le champ entry_id."""
-        services_yaml_path = Path("custom_components/SmartHRT/services.yaml")
+        services_yaml_path = Path("custom_components/SmartHRTX/services.yaml")
 
         if not services_yaml_path.exists():
             pytest.skip("services.yaml non trouvé")

@@ -1,4 +1,4 @@
-"""Coordinator for SmartHRT - Manages the smart heating logic.
+"""Coordinator for SmartHRTX - Manages the smart heating logic.
 
 ADRs implemented in this module:
 - ADR-002: Explicit weather entity selection (weather_entity_id)
@@ -111,7 +111,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
-    """Coordinateur central pour SmartHRT (ADR-027: hérite de DataUpdateCoordinator).
+    """Coordinateur central pour SmartHRTX (ADR-027: hérite de DataUpdateCoordinator).
 
     Hérite de DataUpdateCoordinator pour bénéficier de:
     - Gestion automatique des listeners via CoordinatorEntity
@@ -128,7 +128,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"SmartHRT {entry.data.get(CONF_NAME, 'SmartHRT')}",
+            name=f"SmartHRTX {entry.data.get(CONF_NAME, 'SmartHRTX')}",
             update_interval=None,  # Pas de polling automatique, mises à jour manuelles
         )
 
@@ -143,7 +143,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         )
 
         self.data = SmartHRTData(
-            name=entry.data.get(CONF_NAME, "SmartHRT"),
+            name=entry.data.get(CONF_NAME, "SmartHRTX"),
             tsp=entry.data.get(CONF_TSP, DEFAULT_TSP),
             target_hour=self._parse_time(entry.data.get(CONF_TARGET_HOUR, "06:00:00")),
             recoverycalc_hour=self._parse_time(
@@ -187,7 +187,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
     def _log_prefix(self) -> str:
         """Retourne un préfixe pour les logs incluant le nom et entry_id de l'instance.
 
-        Permet de dissocier les entrées de log quand plusieurs instances SmartHRT
+        Permet de dissocier les entrées de log quand plusieurs instances SmartHRTX
         sont configurées, en incluant le nom et l'identifiant unique.
         """
         return f"[{self.data.name}#{self._entry.entry_id[:8]}]"
@@ -408,13 +408,13 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
                 # Entité météo disponible - lancer en tâche de fond (non-bloquant)
                 self.hass.async_create_task(
                     self._complete_weather_setup(),
-                    name=f"SmartHRT {self.data.name} weather setup",
+                    name=f"SmartHRTX {self.data.name} weather setup",
                 )
         else:
             # Pas d'entité météo configurée - setup minimal en tâche de fond
             self.hass.async_create_task(
                 self._complete_weather_setup(),
-                name=f"SmartHRT {self.data.name} weather setup",
+                name=f"SmartHRTX {self.data.name} weather setup",
             )
 
     async def _on_homeassistant_started(self, event: Event) -> None:

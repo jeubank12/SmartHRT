@@ -1,7 +1,7 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/python
 {
-  "name": "cbarban/hass-SmartHRT",
+  "name": "cbarban/hass-SmartHRTX",
 
   // Use custom Dockerfile to fix Yarn GPG key issue before installing features
   "build": {

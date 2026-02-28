@@ -16,12 +16,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.SmartHRT.const import DEFAULT_TSP
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.const import DEFAULT_TSP
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 class TestIsNightPeriod:
@@ -208,7 +208,7 @@ class TestRestoreStateAfterRestart:
     @pytest.mark.asyncio
     async def test_coherent_heating_on_state(self, create_coordinator):
         """Test: état HEATING_ON persisté, heure=10:00 → cohérent, pas de changement."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 10, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -225,7 +225,7 @@ class TestRestoreStateAfterRestart:
     @pytest.mark.asyncio
     async def test_coherent_monitoring_state(self, create_coordinator):
         """Test: état MONITORING persisté, heure=00:30 → cohérent."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 0, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -243,7 +243,7 @@ class TestRestoreStateAfterRestart:
     @pytest.mark.asyncio
     async def test_detecting_lag_coherent_at_night(self, create_coordinator):
         """Test: état DETECTING_LAG persisté pendant la nuit → cohérent."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 23, 5, 0)
             mock_dt.now.return_value = mock_now
 
@@ -262,7 +262,7 @@ class TestRestoreStateAfterRestart:
     @pytest.mark.asyncio
     async def test_recovery_coherent_during_recovery_period(self, create_coordinator):
         """Test: état RECOVERY persisté pendant la relance → cohérent."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -286,7 +286,7 @@ class TestRestoreStateAfterRestart:
         self, create_coordinator
     ):
         """Test: état MONITORING persisté mais heure=10:00 → reset à HEATING_ON."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 10, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -307,7 +307,7 @@ class TestRestoreStateAfterRestart:
         self, create_coordinator
     ):
         """Test: état HEATING_PROCESS sans recovery_start → reset à HEATING_ON."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 10, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -333,7 +333,7 @@ class TestRestoreTriggersAfterRestart:
         self, create_coordinator
     ):
         """Test: en MONITORING, le trigger recovery_start est reprogrammé."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 0, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -358,7 +358,7 @@ class TestRestoreTriggersAfterRestart:
         self, create_coordinator
     ):
         """Test: en MONITORING, si recovery_start est passée → démarrage immédiat."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             # 05:30, recovery était à 05:00
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
@@ -386,7 +386,7 @@ class TestRestoreTriggersAfterRestart:
     @pytest.mark.asyncio
     async def test_heating_process_checks_target_hour_passed(self, create_coordinator):
         """Test: en HEATING_PROCESS, si target_hour est passée → fin de relance."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             # 06:30, target était à 06:00
             mock_now = datetime(2026, 2, 4, 6, 30, 0)
             mock_dt.now.return_value = mock_now
@@ -414,7 +414,7 @@ class TestPersistenceIntegration:
     @pytest.mark.asyncio
     async def test_state_saved_after_transition(self, create_coordinator, mock_store):
         """Test: l'état est sauvegardé après chaque transition."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 23, 0, 0)
             mock_dt.now.return_value = mock_now
 

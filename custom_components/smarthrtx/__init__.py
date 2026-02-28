@@ -1,4 +1,4 @@
-"""Package initialization for the SmartHRT integration.
+"""Package initialization for the SmartHRTX integration.
 
 ADRs implemented in this module:
 - ADR-001: Global architecture (setup/async_unload_entry)
@@ -44,7 +44,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     de l'entrée de configuration est différente de CONFIG_ENTRY_VERSION.
     """
     _LOGGER.debug(
-        "Migrating SmartHRT config entry from version %s to %s",
+        "Migrating SmartHRTX config entry from version %s to %s",
         entry.version,
         CONFIG_ENTRY_VERSION,
     )
@@ -52,7 +52,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if entry.version > CONFIG_ENTRY_VERSION:
         # Downgrade non supporté
         _LOGGER.error(
-            "Cannot downgrade SmartHRT config entry from version %s to %s",
+            "Cannot downgrade SmartHRTX config entry from version %s to %s",
             entry.version,
             CONFIG_ENTRY_VERSION,
         )
@@ -186,7 +186,7 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     # ADR-045: Validation Pydantic avant application
     try:
         validated = ConfigFlowDataModel(
-            name=entry.data.get(CONF_NAME, "SmartHRT"),
+            name=entry.data.get(CONF_NAME, "SmartHRTX"),
             target_hour=options.get(
                 CONF_TARGET_HOUR,
                 entry.data.get(CONF_TARGET_HOUR, "06:00:00"),
@@ -208,7 +208,7 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
             "persistent_notification",
             "create",
             {
-                "title": "SmartHRT - Configuration invalide",
+                "title": "SmartHRTX - Configuration invalide",
                 "message": f"Erreur de validation: {e}",
                 "notification_id": "smarthrt_config_error",
             },

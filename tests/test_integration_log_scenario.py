@@ -1,6 +1,6 @@
 """Test d'intégration pour reproduire le problème exact identifié dans les logs.
 
-Ce test simule le scénario exact de SmartHRT Chambre#01KGJBGC où:
+Ce test simule le scénario exact de SmartHRTX Chambre#01KGJBGC où:
 1. L'heure de relance était calculée à 19h26 à l'initialisation
 2. Les modifications successives des coefficients l'ont fait évoluer à 21h08
 3. Mais le trigger n'était pas reprogrammé, causant un déclenchement à 19h26
@@ -13,12 +13,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.SmartHRT.const import TimerKey
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.const import TimerKey
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 class TestIntegrationLogScenario:
@@ -80,7 +80,7 @@ class TestIntegrationLogScenario:
             recovery_times.append(coord.data.recovery_start_hour)
 
         # Initialisation à 19h16:17 comme dans les logs
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 19, 16, 17)
             mock_dt.now.return_value = mock_now
 
@@ -107,7 +107,7 @@ class TestIntegrationLogScenario:
 
         # ADR-051: Patch au niveau du timer_manager
         with patch(
-            "custom_components.SmartHRT.timer_manager.async_track_point_in_time",
+            "custom_components.smarthrtx.timer_manager.async_track_point_in_time",
             side_effect=track_scheduling,
         ):
             with patch.object(

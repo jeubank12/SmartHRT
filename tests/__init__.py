@@ -1,1 +1,1 @@
-"""Tests pour l'intégration SmartHRT."""
+"""Tests pour l'intégration SmartHRTX."""

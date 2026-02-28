@@ -1,4 +1,4 @@
-"""Implements the SmartHRT sensors component.
+"""Implements the SmartHRTX sensors component.
 
 ADRs implemented in this module:
 - ADR-012: Expose entities for Lovelace (sensors as HA entities)
@@ -53,7 +53,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class SmartHRTSensorDescription(SensorEntityDescription):
-    """Description étendue pour les sensors SmartHRT (ADR-030)."""
+    """Description étendue pour les sensors SmartHRTX (ADR-030)."""
 
     value_fn: Callable[[SmartHRTData], Any]
     extra_attrs_fn: Callable[[SmartHRTData], dict[str, Any]] | None = None
@@ -207,7 +207,7 @@ SENSOR_DESCRIPTIONS: tuple[SmartHRTSensorDescription, ...] = (
 
 
 class SmartHRTSensor(CoordinatorEntity[SmartHRTCoordinator], SensorEntity):
-    """Sensor générique SmartHRT basé sur description (ADR-030)."""
+    """Sensor générique SmartHRTX basé sur description (ADR-030)."""
 
     entity_description: SmartHRTSensorDescription
 
@@ -222,7 +222,7 @@ class SmartHRTSensor(CoordinatorEntity[SmartHRTCoordinator], SensorEntity):
         self.entity_description = description
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
-        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRT")
+        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRTX")
         self._attr_unique_id = f"{self._device_id}_{description.key}"
         self._attr_has_entity_name = True
 
@@ -268,7 +268,7 @@ class SmartHRTBaseSensor(CoordinatorEntity[SmartHRTCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
-        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRT")
+        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRTX")
         self._attr_has_entity_name = True
 
     @property
@@ -313,7 +313,7 @@ class SmartHRTNightStateSensor(SmartHRTBaseSensor):
 
 
 class SmartHRTStateSensor(SmartHRTBaseSensor):
-    """Sensor exposant l'état courant de la machine à états SmartHRT.
+    """Sensor exposant l'état courant de la machine à états SmartHRTX.
 
     Ce sensor a une logique d'icône dynamique.
     Les labels d'état sont gérés via translation_key (ADR-052 i18n).
@@ -412,7 +412,7 @@ class SmartHRTInstanceInfoSensor(SmartHRTBaseSensor):
             "entry_id": self._config_entry.entry_id,
             "instance_name": self._device_name,
             "config_title": self._config_entry.title,
-            "usage_example": f'service: smarthrt.trigger_calculation\ndata:\n  entry_id: "{self._config_entry.entry_id}"',
+            "usage_example": f'service: smarthrtx.trigger_calculation\ndata:\n  entry_id: "{self._config_entry.entry_id}"',
         }
 
 

@@ -1,4 +1,4 @@
-"""Implements the SmartHRT switch entities.
+"""Implements the SmartHRTX switch entities.
 
 ADRs implemented in this module:
 - ADR-003: Enable/disable the state machine (SmartHeatingSwitch)
@@ -46,7 +46,7 @@ async def async_setup_entry(
 
 
 class SmartHRTBaseSwitch(CoordinatorEntity[SmartHRTCoordinator], SwitchEntity):
-    """Base class for SmartHRT switches (ADR-027: CoordinatorEntity)."""
+    """Base class for SmartHRTX switches (ADR-027: CoordinatorEntity)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
@@ -55,7 +55,7 @@ class SmartHRTBaseSwitch(CoordinatorEntity[SmartHRTCoordinator], SwitchEntity):
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
-        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRT")
+        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRTX")
         self._attr_has_entity_name = True
 
     @property

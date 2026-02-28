@@ -1,4 +1,4 @@
-"""Constants for the SmartHRT integration.
+"""Constants for the SmartHRTX integration.
 
 ADRs implemented in this module:
 - ADR-041: PERSISTED_FIELDS removed, replaced by SmartHRTData.as_dict/from_dict
@@ -22,7 +22,7 @@ class TimerKey(StrEnum):
     RECOVERY_UPDATE = "recovery_update"
 
 
-DOMAIN = "smarthrt"
+DOMAIN = "smarthrtx"
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.NUMBER,
@@ -72,7 +72,7 @@ WIND_HIGH = 60.0
 WIND_LOW = 10.0
 
 # Device info
-DEVICE_MANUFACTURER = "SmartHRT"
+DEVICE_MANUFACTURER = "SmartHRTX"
 
 # Data keys for hass.data[DOMAIN][entry_id]
 DATA_COORDINATOR = "coordinator"

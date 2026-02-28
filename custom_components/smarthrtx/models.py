@@ -1,4 +1,4 @@
-"""Modèles Pydantic pour la validation des données SmartHRT (ADR-029).
+"""Modèles Pydantic pour la validation des données SmartHRTX (ADR-029).
 
 Ce module définit les schémas de validation pour :
 - Les données persistées (coefficients thermiques, état, etc.)

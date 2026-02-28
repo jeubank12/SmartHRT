@@ -1,4 +1,4 @@
-"""Implements the SmartHRT time entities.
+"""Implements the SmartHRTX time entities.
 
 ADRs implemented in this module:
 - ADR-012: Expose entities for Lovelace (time as HA entities)
@@ -48,7 +48,7 @@ async def async_setup_entry(
 
 
 class SmartHRTBaseTime(CoordinatorEntity[SmartHRTCoordinator], TimeEntity):
-    """Base class for SmartHRT time entities (ADR-027: CoordinatorEntity)."""
+    """Base class for SmartHRTX time entities (ADR-027: CoordinatorEntity)."""
 
     def __init__(
         self, coordinator: SmartHRTCoordinator, config_entry: ConfigEntry
@@ -57,7 +57,7 @@ class SmartHRTBaseTime(CoordinatorEntity[SmartHRTCoordinator], TimeEntity):
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._device_id = config_entry.entry_id
-        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRT")
+        self._device_name = config_entry.data.get(CONF_NAME, "SmartHRTX")
         self._attr_has_entity_name = True
 
     @property
@@ -147,5 +147,5 @@ class SmartHRTRecoveryStartTime(SmartHRTBaseTime):
     async def async_set_value(self, value: dt_time) -> None:
         """This entity is read-only (calculated automatically)."""
         _LOGGER.warning(
-            "SmartHRT Recovery Start time is read-only and calculated automatically"
+            "SmartHRTX Recovery Start time is read-only and calculated automatically"
         )
