@@ -5,7 +5,7 @@ default_config:
 logger:
   default: info
   logs:
-    custom_components.smarthrt: debug
+    custom_components.smarthrtx: debug
 
 input_number:
   simulation_temperature:

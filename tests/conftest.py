@@ -1,4 +1,4 @@
-"""Fixtures et configuration pour les tests SmartHRT.
+"""Fixtures et configuration pour les tests SmartHRTX.
 
 Ce module fournit les fixtures communes pour tous les tests,
 notamment le mock du coordinateur et les helpers pour simuler
@@ -14,18 +14,18 @@ import asyncio
 
 import pytest
 
-from custom_components.SmartHRT.const import (
+from custom_components.smarthrtx.const import (
     DEFAULT_RCTH,
     DEFAULT_RPTH,
     DEFAULT_RELAXATION_FACTOR,
     DEFAULT_TSP,
     DOMAIN,
 )
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 @dataclass
@@ -35,7 +35,7 @@ class MockConfigEntry:
     entry_id: str = "test_entry_123"
     data: dict = field(
         default_factory=lambda: {
-            "name": "Test SmartHRT",
+            "name": "Test SmartHRTX",
             "tsp": DEFAULT_TSP,
             "target_hour": "06:00:00",
             "recoverycalc_hour": "23:00:00",
@@ -157,7 +157,7 @@ def mock_store() -> MockStore:
 def coordinator_data() -> SmartHRTData:
     """Fixture pour les données initiales du coordinator."""
     return SmartHRTData(
-        name="Test SmartHRT",
+        name="Test SmartHRTX",
         tsp=DEFAULT_TSP,
         target_hour=dt_time(6, 0, 0),
         recoverycalc_hour=dt_time(23, 0, 0),
@@ -210,18 +210,18 @@ def create_coordinator(mock_hass, mock_entry, mock_store):
 
         with (
             patch(
-                "custom_components.SmartHRT.coordinator.Store", return_value=mock_store
+                "custom_components.smarthrtx.coordinator.Store", return_value=mock_store
             ),
             patch(
-                "custom_components.SmartHRT.coordinator.async_track_time_interval",
+                "custom_components.smarthrtx.coordinator.async_track_time_interval",
                 return_value=lambda: None,
             ),
             patch(
-                "custom_components.SmartHRT.coordinator.async_track_state_change_event",
+                "custom_components.smarthrtx.coordinator.async_track_state_change_event",
                 return_value=lambda: None,
             ),
             patch(
-                "custom_components.SmartHRT.coordinator.async_track_point_in_time",
+                "custom_components.smarthrtx.coordinator.async_track_point_in_time",
                 return_value=lambda: None,
             ),
         ):

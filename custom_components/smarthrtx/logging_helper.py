@@ -1,7 +1,7 @@
-"""Helper module for consistent logging across SmartHRT components.
+"""Helper module for consistent logging across SmartHRTX components.
 
 This module provides utilities to ensure log messages can be dissociated
-when multiple SmartHRT instances are configured, allowing clear
+when multiple SmartHRTX instances are configured, allowing clear
 identification of which instance generated each log entry.
 """
 
@@ -19,12 +19,12 @@ def get_log_prefix(entry: ConfigEntry, name: str | None = None) -> str:
         "[Main Heating#a1b2c3d4]"
 
     Args:
-        entry: The ConfigEntry for the SmartHRT instance
+        entry: The ConfigEntry for the SmartHRTX instance
         name: The instance name (optional, defaults to entry title if not provided)
 
     Returns:
         A formatted prefix string like "[Name#EntryID]"
     """
-    display_name = name or entry.title or "SmartHRT"
+    display_name = name or entry.title or "SmartHRTX"
     entry_id_short = entry.entry_id[:8]
     return f"[{display_name}#{entry_id_short}]"

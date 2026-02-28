@@ -13,11 +13,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.SmartHRT.const import (
+from custom_components.smarthrtx.const import (
     DEFAULT_TSP,
 )
-from custom_components.SmartHRT.coordinator import SmartHRTCoordinator
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.coordinator import SmartHRTCoordinator
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 class TestWeatherForecastPersistence:

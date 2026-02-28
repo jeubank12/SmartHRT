@@ -1,4 +1,4 @@
-"""Pure Python state machine for SmartHRT.
+"""Pure Python state machine for SmartHRTX.
 
 Implements:
 - ADR-033: Decoupled state transition logic
@@ -25,7 +25,7 @@ class LoggerProtocol(Protocol):
 
 
 class SmartHRTState(StrEnum):
-    """SmartHRT state machine states.
+    """SmartHRTX state machine states.
 
     ADR-049: Added INITIALIZING as entry point after (re)start.
 

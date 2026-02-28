@@ -1,4 +1,4 @@
-"""Dataclasses partagées pour le modèle thermique SmartHRT.
+"""Dataclasses partagées pour le modèle thermique SmartHRTX.
 
 ADR-026: Types Pure Python sans dépendance Home Assistant.
 

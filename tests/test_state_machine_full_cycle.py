@@ -9,17 +9,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.SmartHRT.const import (
+from custom_components.smarthrtx.const import (
     DEFAULT_RCTH,
     DEFAULT_RPTH,
     DEFAULT_TSP,
     TEMP_DECREASE_THRESHOLD,
 )
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 class TestFullDayCycle:
@@ -39,7 +39,7 @@ class TestFullDayCycle:
         states_sequence = []
 
         # Étape 1: Journée - HEATING_ON (10:00)
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 3, 10, 0, 0)
 
             coord = await create_coordinator(
@@ -56,7 +56,7 @@ class TestFullDayCycle:
             assert coord.data.current_state == SmartHRTState.HEATING_ON
 
         # Étape 2: Coupure chauffage - DETECTING_LAG (23:00)
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 3, 23, 0, 0)
 
             await coord._async_on_recoverycalc_hour()
@@ -65,7 +65,7 @@ class TestFullDayCycle:
             assert coord.data.current_state == SmartHRTState.DETECTING_LAG
 
         # Étape 3: Détection baisse température - MONITORING (23:10)
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 3, 23, 10, 0)
 
             # Simuler une baisse de température de 0.2°C
@@ -78,7 +78,7 @@ class TestFullDayCycle:
             assert coord.data.current_state == SmartHRTState.MONITORING
 
         # Étape 4: Démarrage relance - HEATING_PROCESS (05:30)
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 5, 30, 0)
 
             coord.data.interior_temp = 17.2
@@ -90,7 +90,7 @@ class TestFullDayCycle:
             assert coord.data.current_state == SmartHRTState.HEATING_PROCESS
 
         # Étape 5: Consigne atteinte - HEATING_ON (05:55)
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 5, 55, 0)
 
             coord.data.interior_temp = coord.data.tsp  # Consigne atteinte
@@ -117,7 +117,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_rapid_temperature_fluctuation(self, create_coordinator):
         """Test: fluctuation rapide de température pendant DETECTING_LAG."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 3, 23, 5, 0)
 
             coord = await create_coordinator(
@@ -148,7 +148,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_target_hour_reached_before_tsp(self, create_coordinator):
         """Test: target_hour atteint avant que TSP soit atteint."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 6, 0, 0)
 
             coord = await create_coordinator(
@@ -169,7 +169,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_smartheating_mode_disabled_at_recoverycalc(self, create_coordinator):
         """Test: smartheating_mode=False à recoverycalc_hour."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 3, 23, 0, 0)
 
             coord = await create_coordinator(
@@ -186,7 +186,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_recovery_start_already_in_heating_process(self, create_coordinator):
         """Test: on_recovery_start ignoré si déjà en HEATING_PROCESS."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 5, 35, 0)
 
             coord = await create_coordinator(
@@ -210,7 +210,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_multiple_temperature_decreases(self, create_coordinator):
         """Test: plusieurs baisses successives de température."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 3, 23, 10, 0)
 
             coord = await create_coordinator(
@@ -242,7 +242,7 @@ class TestModeInteractions:
     @pytest.mark.asyncio
     async def test_recovery_adaptive_mode_affects_learning(self, create_coordinator):
         """Test: recovery_adaptive_mode contrôle l'apprentissage."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 6, 0, 0)
 
             coord = await create_coordinator(
@@ -289,7 +289,7 @@ class TestTemperatureThresholds:
     @pytest.mark.asyncio
     async def test_temp_decrease_threshold_exact(self, create_coordinator):
         """Test: baisse exactement égale au seuil déclenche la transition."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 3, 23, 10, 0)
 
             coord = await create_coordinator(
@@ -309,7 +309,7 @@ class TestTemperatureThresholds:
     @pytest.mark.asyncio
     async def test_tsp_exact_triggers_recovery_end(self, create_coordinator):
         """Test: température exactement égale à TSP déclenche la fin."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 5, 55, 0)
 
             coord = await create_coordinator(
@@ -348,7 +348,7 @@ class TestStateDataConsistency:
     @pytest.mark.asyncio
     async def test_time_recovery_calc_set_at_recoverycalc(self, create_coordinator):
         """Test: time_recovery_calc est défini à recoverycalc_hour."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             expected_time = datetime(2026, 2, 3, 23, 0, 0)
             mock_dt.now.return_value = expected_time
 
@@ -365,7 +365,7 @@ class TestStateDataConsistency:
     @pytest.mark.asyncio
     async def test_time_recovery_start_set_at_recovery(self, create_coordinator):
         """Test: time_recovery_start est défini à on_recovery_start."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             expected_time = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = expected_time
 
@@ -382,7 +382,7 @@ class TestStateDataConsistency:
     @pytest.mark.asyncio
     async def test_time_recovery_end_set_at_end(self, create_coordinator):
         """Test: time_recovery_end est défini à on_recovery_end."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             expected_time = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = expected_time
 

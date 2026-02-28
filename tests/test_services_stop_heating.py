@@ -1,4 +1,4 @@
-"""Tests pour les services SmartHRT.
+"""Tests pour les services SmartHRTX.
 
 Ces tests vérifient le bon fonctionnement des services, en particulier
 le service stop_heating qui doit appeler correctement la méthode async.
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
@@ -37,7 +37,7 @@ class TestStopHeatingService:
         Maintenant, le code fait:
             await coord._async_on_recoverycalc_hour()
         """
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
 
@@ -61,7 +61,7 @@ class TestStopHeatingService:
         Cette méthode est décorée avec @callback et retourne None.
         On ne peut pas faire 'await' dessus.
         """
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
 
@@ -78,7 +78,7 @@ class TestStopHeatingService:
     @pytest.mark.asyncio
     async def test_async_on_recoverycalc_hour_is_awaitable(self, create_coordinator):
         """Vérifie que _async_on_recoverycalc_hour est bien une coroutine awaitable."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
 
@@ -100,7 +100,7 @@ class TestStopHeatingService:
     @pytest.mark.asyncio
     async def test_stop_heating_transitions_state_correctly(self, create_coordinator):
         """Vérifie la transition complète lors de l'arrêt du chauffage."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
 
@@ -126,7 +126,7 @@ class TestStopHeatingService:
     @pytest.mark.asyncio
     async def test_stop_heating_records_timestamp(self, create_coordinator):
         """Vérifie que l'heure de coupure est enregistrée."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=28, second=18)
             mock_dt.now.return_value = mock_now
 
@@ -158,7 +158,7 @@ class TestServiceIntegration:
         """
         from pathlib import Path
 
-        services_path = Path("custom_components/SmartHRT/services.py")
+        services_path = Path("custom_components/SmartHRTX/services.py")
 
         if not services_path.exists():
             pytest.skip("Fichier services.py non trouvé")

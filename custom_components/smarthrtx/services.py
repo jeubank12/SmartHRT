@@ -1,4 +1,4 @@
-"""Gestion centralisée des services SmartHRT.
+"""Gestion centralisée des services SmartHRTX.
 
 Ce module gère l'enregistrement et le désenregistrement des services
 au niveau du domaine, évitant les race conditions lorsque plusieurs
@@ -51,10 +51,10 @@ def _get_coordinator(hass: HomeAssistant, entry_id: str | None):
         entry_id: ID optionnel de l'entrée de configuration
 
     Returns:
-        Le coordinateur SmartHRT ou None si non trouvé
+        Le coordinateur SmartHRTX ou None si non trouvé
     """
     if DOMAIN not in hass.data:
-        _LOGGER.error("Aucune instance SmartHRT configurée")
+        _LOGGER.error("Aucune instance SmartHRTX configurée")
         return None
 
     # Collecter tous les coordinateurs disponibles
@@ -65,7 +65,7 @@ def _get_coordinator(hass: HomeAssistant, entry_id: str | None):
     }
 
     if not available_coordinators:
-        _LOGGER.error("Aucun coordinateur SmartHRT trouvé")
+        _LOGGER.error("Aucun coordinateur SmartHRTX trouvé")
         return None
 
     # Si entry_id est fourni, l'utiliser
@@ -84,7 +84,7 @@ def _get_coordinator(hass: HomeAssistant, entry_id: str | None):
     # Si pas d'entry_id et plusieurs instances, avertir l'utilisateur
     if len(available_coordinators) > 1:
         _LOGGER.warning(
-            "Plusieurs instances SmartHRT détectées (%d) mais aucun entry_id fourni. "
+            "Plusieurs instances SmartHRTX détectées (%d) mais aucun entry_id fourni. "
             "Utilisation de la première instance. Instances disponibles: %s. "
             "Veuillez spécifier 'entry_id' pour cibler une instance spécifique.",
             len(available_coordinators),
@@ -98,7 +98,7 @@ def _get_coordinator(hass: HomeAssistant, entry_id: str | None):
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
-    """Enregistre les services SmartHRT.
+    """Enregistre les services SmartHRTX.
 
     Cette fonction est appelée une seule fois lors du setup de la
     première instance de l'intégration. Les services sont partagés
@@ -106,7 +106,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     """
     # Vérifier si les services sont déjà enregistrés
     if hass.data.get(DOMAIN, {}).get(DATA_SERVICES_REGISTERED):
-        _LOGGER.debug("Services SmartHRT déjà enregistrés")
+        _LOGGER.debug("Services SmartHRTX déjà enregistrés")
         return
 
     schema = vol.Schema({vol.Optional("entry_id"): str})
@@ -122,7 +122,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = (
                 f"Coordinateur non trouvé pour entry_id={entry_id}"
                 if entry_id
-                else "Aucun coordinateur SmartHRT disponible"
+                else "Aucun coordinateur SmartHRTX disponible"
             )
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -150,7 +150,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = (
                 f"Coordinateur non trouvé pour entry_id={entry_id}"
                 if entry_id
-                else "Aucun coordinateur SmartHRT disponible"
+                else "Aucun coordinateur SmartHRTX disponible"
             )
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -169,7 +169,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = (
                 f"Coordinateur non trouvé pour entry_id={entry_id}"
                 if entry_id
-                else "Aucun coordinateur SmartHRT disponible"
+                else "Aucun coordinateur SmartHRTX disponible"
             )
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -187,7 +187,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = (
                 f"Coordinateur non trouvé pour entry_id={entry_id}"
                 if entry_id
-                else "Aucun coordinateur SmartHRT disponible"
+                else "Aucun coordinateur SmartHRTX disponible"
             )
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -205,7 +205,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = (
                 f"Coordinateur non trouvé pour entry_id={entry_id}"
                 if entry_id
-                else "Aucun coordinateur SmartHRT disponible"
+                else "Aucun coordinateur SmartHRTX disponible"
             )
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -223,7 +223,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = (
                 f"Coordinateur non trouvé pour entry_id={entry_id}"
                 if entry_id
-                else "Aucun coordinateur SmartHRT disponible"
+                else "Aucun coordinateur SmartHRTX disponible"
             )
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -241,7 +241,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = (
                 f"Coordinateur non trouvé pour entry_id={entry_id}"
                 if entry_id
-                else "Aucun coordinateur SmartHRT disponible"
+                else "Aucun coordinateur SmartHRTX disponible"
             )
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
@@ -275,11 +275,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     # Marquer les services comme enregistrés
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][DATA_SERVICES_REGISTERED] = True
-    _LOGGER.info("Services SmartHRT enregistrés avec succès")
+    _LOGGER.info("Services SmartHRTX enregistrés avec succès")
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
-    """Désenregistre les services SmartHRT.
+    """Désenregistre les services SmartHRTX.
 
     Cette fonction est appelée uniquement lorsque la dernière instance
     de l'intégration est déchargée.
@@ -297,7 +297,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     # Ne désenregistrer que si c'est la dernière instance
     if remaining_coordinators > 0:
         _LOGGER.debug(
-            "Services SmartHRT conservés (%d instance(s) restante(s))",
+            "Services SmartHRTX conservés (%d instance(s) restante(s))",
             remaining_coordinators,
         )
         return
@@ -311,4 +311,4 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     if DATA_SERVICES_REGISTERED in hass.data.get(DOMAIN, {}):
         del hass.data[DOMAIN][DATA_SERVICES_REGISTERED]
 
-    _LOGGER.info("Services SmartHRT désenregistrés")
+    _LOGGER.info("Services SmartHRTX désenregistrés")

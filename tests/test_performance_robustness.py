@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from custom_components.SmartHRT.const import TimerKey
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.const import TimerKey
+from custom_components.smarthrtx.coordinator import (
     SmartHRTState,
 )
 

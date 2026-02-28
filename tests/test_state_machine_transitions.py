@@ -1,4 +1,4 @@
-"""Tests pour les transitions de la machine à états SmartHRT.
+"""Tests pour les transitions de la machine à états SmartHRTX.
 
 ADR-003: Machine à états explicite pour le cycle de chauffage
 
@@ -15,17 +15,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.SmartHRT.const import (
+from custom_components.smarthrtx.const import (
     DEFAULT_RCTH,
     DEFAULT_RPTH,
     DEFAULT_TSP,
     TEMP_DECREASE_THRESHOLD,
 )
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 class TestTransitionHeatingOnToDetectingLag:
@@ -55,7 +55,7 @@ class TestTransitionHeatingOnToDetectingLag:
         self, coordinator_heating_on
     ):
         """Vérifie que l'état passe à DETECTING_LAG après recoverycalc_hour."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 23, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -70,7 +70,7 @@ class TestTransitionHeatingOnToDetectingLag:
     @pytest.mark.asyncio
     async def test_transition_activates_lag_detection(self, coordinator_heating_on):
         """Vérifie que temp_lag_detection_active est activé."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 23, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -82,7 +82,7 @@ class TestTransitionHeatingOnToDetectingLag:
     @pytest.mark.asyncio
     async def test_transition_records_temp_recovery_calc(self, coordinator_heating_on):
         """Vérifie que la température de référence est enregistrée."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 23, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -96,7 +96,7 @@ class TestTransitionHeatingOnToDetectingLag:
     @pytest.mark.asyncio
     async def test_transition_records_time_recovery_calc(self, coordinator_heating_on):
         """Vérifie que l'heure de coupure est enregistrée."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 23, 0, 0)
             mock_dt.now.return_value = mock_now
 
@@ -118,7 +118,7 @@ class TestTransitionDetectingLagToMonitoring:
         """Fixture pour un coordinator en état DETECTING_LAG."""
 
         async def _setup():
-            with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+            with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
                 mock_now = datetime(2026, 2, 3, 23, 5, 0)
                 mock_dt.now.return_value = mock_now
 
@@ -137,7 +137,7 @@ class TestTransitionDetectingLagToMonitoring:
     @pytest.mark.asyncio
     async def test_transition_on_temperature_decrease(self, coordinator_detecting_lag):
         """Vérifie la transition vers MONITORING après baisse de 0.2°C."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 23, 10, 0)
             mock_dt.now.return_value = mock_now
 
@@ -176,7 +176,7 @@ class TestTransitionDetectingLagToMonitoring:
         self, coordinator_detecting_lag
     ):
         """Vérifie que recovery_calc_mode est activé après la transition."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 23, 10, 0)
             mock_dt.now.return_value = mock_now
 
@@ -195,7 +195,7 @@ class TestTransitionDetectingLagToMonitoring:
         self, coordinator_detecting_lag
     ):
         """Vérifie que temp_lag_detection_active est désactivé."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 23, 10, 0)
             mock_dt.now.return_value = mock_now
 
@@ -214,7 +214,7 @@ class TestTransitionDetectingLagToMonitoring:
         self, coordinator_detecting_lag
     ):
         """Vérifie que la durée du lag est calculée."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             # 10 minutes après recoverycalc
             mock_now = datetime(2026, 2, 3, 23, 10, 0)
             mock_dt.now.return_value = mock_now
@@ -259,7 +259,7 @@ class TestTransitionMonitoringToRecovery:
     @pytest.mark.asyncio
     async def test_transition_to_recovery_on_start(self, coordinator_monitoring):
         """Vérifie la transition vers RECOVERY à recovery_start_hour."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -277,7 +277,7 @@ class TestTransitionMonitoringToRecovery:
         self, coordinator_monitoring
     ):
         """Vérifie que les valeurs de début de relance sont enregistrées."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -294,7 +294,7 @@ class TestTransitionMonitoringToRecovery:
     @pytest.mark.asyncio
     async def test_transition_activates_rp_calc_mode(self, coordinator_monitoring):
         """Vérifie que rp_calc_mode est activé."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -309,7 +309,7 @@ class TestTransitionMonitoringToRecovery:
         self, coordinator_monitoring
     ):
         """Vérifie que recovery_calc_mode est désactivé."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -332,7 +332,7 @@ class TestTransitionRecoveryToHeatingProcess:
         self, create_coordinator
     ):
         """Vérifie que RECOVERY passe immédiatement à HEATING_PROCESS."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
 
@@ -375,7 +375,7 @@ class TestTransitionHeatingProcessToHeatingOn:
     @pytest.mark.asyncio
     async def test_transition_on_tsp_reached(self, coordinator_heating_process):
         """Vérifie la transition vers HEATING_ON quand TSP est atteint."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
@@ -393,7 +393,7 @@ class TestTransitionHeatingProcessToHeatingOn:
     @pytest.mark.asyncio
     async def test_transition_on_tsp_exceeded(self, coordinator_heating_process):
         """Vérifie la transition quand la température dépasse TSP."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
@@ -425,7 +425,7 @@ class TestTransitionHeatingProcessToHeatingOn:
         self, coordinator_heating_process
     ):
         """Vérifie que rp_calc_mode est désactivé après la transition."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
@@ -443,7 +443,7 @@ class TestTransitionHeatingProcessToHeatingOn:
         self, coordinator_heating_process
     ):
         """Vérifie que les valeurs de fin de relance sont enregistrées."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
@@ -462,7 +462,7 @@ class TestTransitionHeatingProcessToHeatingOn:
     @pytest.mark.asyncio
     async def test_transition_on_target_hour(self, coordinator_heating_process):
         """Vérifie la transition à target_hour même si TSP non atteint."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 6, 0, 0)
             mock_dt.now.return_value = mock_now
 

@@ -1,4 +1,4 @@
-"""Config Flow for SmartHRT.
+"""Config Flow for SmartHRTX.
 
 ADRs implemented in this module:
 - ADR-002: Explicit weather entity selection (weather_entity selector)
@@ -107,7 +107,7 @@ def add_suggested_values_to_schema(
 
 
 class SmartHRTConfigFlow(ConfigFlow, domain=DOMAIN):
-    """La classe qui implémente le config flow pour SmartHRT.
+    """La classe qui implémente le config flow pour SmartHRTX.
     Elle doit dériver de ConfigFlow"""
 
     # La version de notre configFlow. Va permettre de migrer les entités
@@ -331,7 +331,7 @@ DYNAMIC_KEYS = {CONF_TARGET_HOUR, CONF_RECOVERYCALC_HOUR, CONF_TSP, CONF_TEMP_UN
 
 
 class SmartHRTOptionsFlow(OptionsFlow):
-    """Implements the options flow for SmartHRT.
+    """Implements the options flow for SmartHRTX.
     Must derive from OptionsFlow.
 
     Dynamic settings are stored in 'options' to allow

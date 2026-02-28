@@ -1,4 +1,4 @@
-"""Tests pour la reprogrammation des triggers de relance SmartHRT.
+"""Tests pour la reprogrammation des triggers de relance SmartHRTX.
 
 Ce module teste le problème critique où l'heure de relance était recalculée
 mais le trigger n'était pas reprogrammé, causant un déclenchement à l'ancienne heure.
@@ -20,17 +20,17 @@ from unittest.mock import AsyncMock, MagicMock, patch, call
 
 import pytest
 
-from custom_components.SmartHRT.const import (
+from custom_components.smarthrtx.const import (
     DEFAULT_RCTH,
     DEFAULT_RPTH,
     DEFAULT_TSP,
     TimerKey,
 )
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 class TestRecoveryTriggerRescheduling:
@@ -227,7 +227,7 @@ class TestRecoveryTriggerRescheduling:
         coord = await coordinator_monitoring()
 
         with patch.object(coord, "_schedule_recovery_start") as mock_schedule:
-            with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+            with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
                 mock_now = datetime(2026, 2, 3, 20, 0, 0)
                 mock_dt.now.return_value = mock_now
 
@@ -293,7 +293,7 @@ class TestTriggerCancellationAndLogging:
         """Test que les logs indiquent correctement une reprogrammation."""
         coord = await coordinator_with_active_trigger()
 
-        with patch("custom_components.SmartHRT.coordinator._LOGGER") as mock_logger:
+        with patch("custom_components.smarthrtx.coordinator._LOGGER") as mock_logger:
             new_time = datetime(2026, 2, 3, 22, 0, 0)
             coord._schedule_recovery_start(new_time)
 
@@ -311,7 +311,7 @@ class TestTriggerCancellationAndLogging:
         # S'assurer qu'aucun timer n'est actif
         coord._timer_manager.cancel(TimerKey.RECOVERY_START)
 
-        with patch("custom_components.SmartHRT.coordinator._LOGGER") as mock_logger:
+        with patch("custom_components.smarthrtx.coordinator._LOGGER") as mock_logger:
             new_time = datetime(2026, 2, 3, 21, 0, 0)
             coord._schedule_recovery_start(new_time)
 
@@ -334,7 +334,7 @@ class TestRegressionScenario:
         """
 
         # Setup initial à 19h16 comme dans les logs
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 3, 19, 16, 17)
             mock_dt.now.return_value = mock_now
 
@@ -351,7 +351,7 @@ class TestRegressionScenario:
 
             # ADR-051: Patch au niveau du timer_manager
             with patch(
-                "custom_components.SmartHRT.timer_manager.async_track_point_in_time"
+                "custom_components.smarthrtx.timer_manager.async_track_point_in_time"
             ) as mock_track:
                 mock_track.return_value = MagicMock()
 
@@ -405,7 +405,7 @@ class TestRegressionScenario:
 
         # ADR-051: Patch au niveau du timer_manager
         with patch(
-            "custom_components.SmartHRT.timer_manager.async_track_point_in_time"
+            "custom_components.smarthrtx.timer_manager.async_track_point_in_time"
         ) as mock_track:
             mock_track.return_value = MagicMock()
 

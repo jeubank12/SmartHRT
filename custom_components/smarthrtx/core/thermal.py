@@ -1,4 +1,4 @@
-"""Modèle thermique Pure Python pour SmartHRT.
+"""Modèle thermique Pure Python pour SmartHRTX.
 
 ADR-026: Extraction du modèle thermique en Pure Python.
 ADR-031: Optimisation algorithmique avec convergence adaptative.

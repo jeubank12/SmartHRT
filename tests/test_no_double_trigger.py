@@ -14,12 +14,12 @@ from unittest.mock import AsyncMock, MagicMock, patch, call
 
 import pytest
 
-from custom_components.SmartHRT.const import TimerKey
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.const import TimerKey
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 def make_mock_now(year=2026, month=2, day=4, hour=8, minute=0, second=0):
@@ -37,7 +37,7 @@ class TestNoDoubleTriggerOnTargetHourChange:
         ADR-051: schedule() annule automatiquement l'ancien timer avant
         d'en programmer un nouveau pour la même clé.
         """
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
             mock_dt.as_local.side_effect = lambda x: x
@@ -57,7 +57,7 @@ class TestNoDoubleTriggerOnTargetHourChange:
     @pytest.mark.asyncio
     async def test_set_target_hour_uses_timer_manager(self, create_coordinator):
         """Vérifie que set_target_hour utilise le TimerManager correctement."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
             mock_dt.as_local.side_effect = lambda x: x
@@ -76,7 +76,7 @@ class TestNoDoubleTriggerOnTargetHourChange:
     @pytest.mark.asyncio
     async def test_no_error_when_no_timer_exists(self, create_coordinator):
         """Vérifie qu'il n'y a pas d'erreur si aucun timer n'existe."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
             mock_dt.as_local.side_effect = lambda x: x
@@ -101,7 +101,7 @@ class TestNoDoubleTriggerOnTargetHourChange:
         self, create_coordinator
     ):
         """Vérifie que le trigger recovery_update fonctionne après changement."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=7, minute=0, second=0)
             mock_dt.now.return_value = mock_now
             mock_dt.as_local.side_effect = lambda x: x
@@ -127,7 +127,7 @@ class TestNoDoubleTriggerOnTargetHourChange:
         Scénario du bug rapporté: en état MONITORING, quand target_hour change,
         recovery_start_hour doit être recalculé et le trigger reprogrammé.
         """
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=18, minute=14, second=0)
             mock_dt.now.return_value = mock_now
             mock_dt.as_local.side_effect = lambda x: x
@@ -167,7 +167,7 @@ class TestTriggerCleanupConsistency:
     @pytest.mark.asyncio
     async def test_cancel_time_triggers_clears_all(self, create_coordinator):
         """Vérifie que _cancel_time_triggers annule tous les timers horaires."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
             mock_dt.as_local.side_effect = lambda x: x
@@ -190,7 +190,7 @@ class TestTriggerCleanupConsistency:
     @pytest.mark.asyncio
     async def test_async_unload_cancels_all_timers(self, create_coordinator):
         """Vérifie que async_unload annule tous les timers via TimerManager."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=0)
             mock_dt.now.return_value = mock_now
             mock_dt.as_local.side_effect = lambda x: x

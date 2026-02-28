@@ -13,11 +13,11 @@ from unittest.mock import AsyncMock, MagicMock, patch, call
 
 import pytest
 
-from custom_components.SmartHRT.coordinator import (
+from custom_components.smarthrtx.coordinator import (
     SmartHRTCoordinator,
     SmartHRTState,
 )
-from custom_components.SmartHRT.data_model import SmartHRTData  # ADR-047
+from custom_components.smarthrtx.data_model import SmartHRTData  # ADR-047
 
 
 def make_mock_now(year=2026, month=2, day=4, hour=8, minute=0, second=0):
@@ -37,7 +37,7 @@ class TestSetRecoverycalcHourTriggerImmediate:
         Scénario: recoverycalc_hour = 08:00, heure actuelle = 08:00:30
         Quand on change vers 21:00, le trigger de 08:00 doit s'exécuter.
         """
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             # Il est 08:00:30, le trigger de 08:00 vient de passer
             mock_now = make_mock_now(hour=8, minute=0, second=30)
             mock_dt.now.return_value = mock_now
@@ -66,7 +66,7 @@ class TestSetRecoverycalcHourTriggerImmediate:
     @pytest.mark.asyncio
     async def test_no_trigger_when_not_heating_on(self, create_coordinator):
         """Vérifie qu'aucun trigger n'est exécuté si on n'est pas en HEATING_ON."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=30)
             mock_dt.now.return_value = mock_now
 
@@ -97,7 +97,7 @@ class TestSetRecoverycalcHourTriggerImmediate:
     @pytest.mark.asyncio
     async def test_no_trigger_when_old_hour_not_yet_passed(self, create_coordinator):
         """Vérifie qu'aucun trigger n'est exécuté si l'ancienne heure n'est pas passée."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             # Il est 07:30, le trigger de 08:00 n'est pas encore passé
             mock_now = make_mock_now(hour=7, minute=30, second=0)
             mock_dt.now.return_value = mock_now
@@ -128,7 +128,7 @@ class TestSetRecoverycalcHourTriggerImmediate:
         self, create_coordinator
     ):
         """Vérifie qu'aucun trigger n'est exécuté si l'ancienne heure est passée depuis trop longtemps."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             # Il est 08:10, le trigger de 08:00 est passé depuis 10 minutes (> 5 min)
             mock_now = make_mock_now(hour=8, minute=10, second=0)
             mock_dt.now.return_value = mock_now
@@ -162,7 +162,7 @@ class TestSetRecoverycalcHourTriggerImmediate:
         depuis moins de 60 secondes (pas 5 minutes). Au-delà, seule la
         sauvegarde est effectuée.
         """
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             # Il est 08:04:59, le trigger de 08:00 est passé depuis ~5 min
             # (hors de la fenêtre de 60 secondes)
             mock_now = make_mock_now(hour=8, minute=4, second=59)
@@ -196,7 +196,7 @@ class TestSetRecoverycalcHourStateChange:
     @pytest.mark.asyncio
     async def test_state_transitions_to_detecting_lag(self, create_coordinator):
         """Vérifie que l'état passe à DETECTING_LAG après le trigger immédiat."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=8, minute=0, second=30)
             mock_dt.now.return_value = mock_now
 
@@ -215,7 +215,7 @@ class TestSetRecoverycalcHourStateChange:
     @pytest.mark.asyncio
     async def test_recoverycalc_hour_updated_correctly(self, create_coordinator):
         """Vérifie que recoverycalc_hour est correctement mis à jour."""
-        with patch("custom_components.SmartHRT.coordinator.dt_util") as mock_dt:
+        with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = make_mock_now(hour=7, minute=30, second=0)
             mock_dt.now.return_value = mock_now
 

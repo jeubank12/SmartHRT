@@ -12,7 +12,7 @@ start_heating_cycle:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRT (multi-instance). Si vous avez plusieurs instances, 
+        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
         spécifiez l'entry_id pour cibler une instance spécifique.
       required: false
       advanced: true
@@ -30,7 +30,7 @@ stop_heating:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRT (multi-instance). Si vous avez plusieurs instances, 
+        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
         spécifiez l'entry_id pour cibler une instance spécifique.
       required: false
       advanced: true
@@ -48,7 +48,7 @@ start_recovery:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRT (multi-instance). Si vous avez plusieurs instances, 
+        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
         spécifiez l'entry_id pour cibler une instance spécifique.
       required: false
       advanced: true
@@ -66,7 +66,7 @@ end_recovery:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRT (multi-instance). Si vous avez plusieurs instances, 
+        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
         spécifiez l'entry_id pour cibler une instance spécifique.
       required: false
       advanced: true
@@ -84,7 +84,7 @@ get_state:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRT (multi-instance). Si vous avez plusieurs instances, 
+        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
         spécifiez l'entry_id pour cibler une instance spécifique.
       required: false
       advanced: true
@@ -107,7 +107,7 @@ reset_learning:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRT (multi-instance). Si vous avez plusieurs instances, 
+        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
         spécifiez l'entry_id pour cibler une instance spécifique.
       required: false
       advanced: true
@@ -125,7 +125,7 @@ trigger_calculation:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRT (multi-instance). Si vous avez plusieurs instances, 
+        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
         spécifiez l'entry_id pour cibler une instance spécifique.
       required: false
       advanced: true

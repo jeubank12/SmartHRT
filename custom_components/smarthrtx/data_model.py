@@ -1,4 +1,4 @@
-"""Modèle de données unifié SmartHRT (ADR-047: Single Source of Truth).
+"""Modèle de données unifié SmartHRTX (ADR-047: Single Source of Truth).
 
 Ce module fusionne l'ancien SmartHRTData (dataclass custom) et
 PersistedDataModel (Pydantic) en un seul modèle Pydantic v2.
@@ -137,7 +137,7 @@ DateTimeField = Annotated[
 
 
 class SmartHRTData(BaseModel):
-    """Modèle de données unifié pour SmartHRT (ADR-047: Single Source of Truth).
+    """Modèle de données unifié pour SmartHRTX (ADR-047: Single Source of Truth).
 
     Ce modèle Pydantic remplace:
     - L'ancienne classe SmartHRTData (custom avec sous-structures)
@@ -163,7 +163,7 @@ class SmartHRTData(BaseModel):
     # ─────────────────────────────────────────────────────────────────────────
     # Configuration statique (modifiable via l'UI ou les services)
     # ─────────────────────────────────────────────────────────────────────────
-    name: str = Field(default="SmartHRT", min_length=1, max_length=100)
+    name: str = Field(default="SmartHRTX", min_length=1, max_length=100)
     tsp: float = Field(default=DEFAULT_TSP, ge=13.0, le=26.0)
     target_hour: TimeField = Field(default_factory=lambda: dt_time(6, 0, 0))
     recoverycalc_hour: TimeField = Field(default_factory=lambda: dt_time(23, 0, 0))
@@ -260,7 +260,7 @@ class SmartHRTData(BaseModel):
         """Valide que le nom n'est pas vide."""
         v = v.strip()
         if not v:
-            return "SmartHRT"
+            return "SmartHRTX"
         return v
 
     # ─────────────────────────────────────────────────────────────────────────
