@@ -1,12 +1,12 @@
 {
   "domain": "smarthrtx",
   "name": "SmartHRTX",
-  "codeowners": ["@CorentinBarban"],
+  "codeowners": ["@jeubank12"],
   "config_flow": true,
-  "documentation": "https://github.com/CorentinBarban/SmartHRTX",
+  "documentation": "https://github.com/jeubank12/SmartHRT",
   "integration_type": "device",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/CorentinBarban/SmartHRTX/issues",
+  "issue_tracker": "https://github.com/jeubank12/SmartHRT/issues",
   "quality_scale": "silver",
   "version": "2.0.1"
 }

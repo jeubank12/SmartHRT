@@ -1,23 +1,25 @@
-# SmartHRT
+# SmartHRTX
 
 **Smart Heating Recovery Time** - Intelligent heating startup time calculation.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/v/release/corentinBarban/smartHRT?include_prereleases)](https://github.com/corentinBarban/SmartHRT/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/jeubank12/SmartHRT?include_prereleases)](https://github.com/jeubank12/SmartHRT/releases)
 
 ## 🙏 Acknowledgments
 
-**[@ebozonne](https://github.com/ebozonne)**: Author of the [original SmartHRT code](https://github.com/ebozonne/SmartHRT) on which this native integration is based
+**[@CorentinBarban](https://github.com/CorentinBarban)**: Author of [SmartHRT](https://github.com/CorentinBarban/SmartHRT), the native HA integration and polished UI that SmartHRTX is forked from. This fork adds small quality-of-life tweaks (e.g. °C/°F unit preference in the config form). A PR contributing the unit handling back upstream is planned.
+
+**[@ebozonne](https://github.com/ebozonne)**: Author of the [original SmartHRT script](https://github.com/ebozonne/SmartHRT) on which the native integration is based
 
 ## What is it?
 
-SmartHRT automatically calculates when to start the heating in the morning to reach your desired temperature at wake-up time. The algorithm continuously learns your home's thermal characteristics.
+SmartHRTX automatically calculates when to start the heating in the morning to reach your desired temperature at wake-up time. The algorithm continuously learns your home's thermal characteristics.
 
 ## Installation & Configuration
 
 👉 **[User Guide](docs/GUIDE.md)** - Installation, setup, and everyday use.
 
-After installation, configure the integration via **Settings → Devices & Services → SmartHRT**.
+After installation, configure the integration via **Settings → Devices & Services → SmartHRTX**.
 
 ## Documentation
 
@@ -31,7 +33,7 @@ After installation, configure the integration via **Settings → Devices & Servi
 
 → **[Complete technical explanation](docs/ARCHITECTURE.md#thermal-model)**
 
-SmartHRT uses Newton's law of cooling to calculate recovery time:
+SmartHRTX uses Newton's law of cooling to calculate recovery time:
 
 **Key Parameters**:
 
@@ -72,13 +74,13 @@ Required parameters are configured via the Home Assistant interface:
 
 ## 📊 Created Entities
 
-SmartHRT automatically creates **Sensors**, **Numbers**, **Switches** and **Time** entities. See [User Guide](docs/GUIDE.md#available-sensors--controls) for complete list and descriptions.
+SmartHRTX automatically creates **Sensors**, **Numbers**, **Switches** and **Time** entities. See [User Guide](docs/GUIDE.md#available-sensors--controls) for complete list and descriptions.
 
 ---
 
 ## 🔧 Services
 
-SmartHRT provides Home Assistant services to control the heating cycle manually if needed.
+SmartHRTX provides Home Assistant services to control the heating cycle manually if needed.
 
 → **[Complete services documentation](docs/SERVICES.md)**
 
@@ -95,7 +97,7 @@ SmartHRT provides Home Assistant services to control the heating cycle manually 
 **Example**:
 
 ```yaml
-service: smarthrt.stop_heating
+service: smarthrtx.stop_heating
 ```
 
 See [Services Migration Guide](docs/SERVICES_MIGRATION.md) if upgrading from older versions.
