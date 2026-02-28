@@ -20,13 +20,15 @@
           "target_hour": "Zielzeit",
           "recoverycalc_hour": "Heizung Abschaltzeit",
           "sensor_interior_temperature": "Innentemperatursensor",
-          "tsp": "Solltemperatur (Set Point)"
+          "tsp": "Solltemperatur (Set Point)",
+          "temp_unit": "Temperatureinheit"
         },
         "data_description": {
           "target_hour": "Gewünschte Aufwachzeit (z.B.: 6:00)",
           "recoverycalc_hour": "Abschaltzeit der Heizung am Abend (z.B.: 23:00)",
           "sensor_interior_temperature": "Raumtemperatursensor (z.B.: sensor.room_temperature)",
-          "tsp": "Gewünschte Temperatur (13-26°C)"
+          "tsp": "Gewünschte Temperatur (13–26 °C oder 55–79 °F)",
+          "temp_unit": "Einheit zur Eingabe des Sollwerts (intern als °C gespeichert)"
         }
       }
     }

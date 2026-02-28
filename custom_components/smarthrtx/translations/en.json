@@ -21,14 +21,16 @@
           "recoverycalc_hour": "Heating stop hour",
           "sensor_interior_temperature": "Interior temperature sensor",
           "weather_entity": "Weather source (outdoor temperature)",
-          "tsp": "Set Point"
+          "tsp": "Set Point",
+          "temp_unit": "Temperature unit"
         },
         "data_description": {
           "target_hour": "Wake up time (e.g. 6:00)",
           "recoverycalc_hour": "Time when heating stops (e.g. 23:00)",
           "sensor_interior_temperature": "Room temperature sensor (e.g. sensor.room_temperature)",
           "weather_entity": "Weather integration providing outdoor temperature and wind speed (e.g. weather.home, weather.meteo_france).",
-          "tsp": "Target temperature (13-26°C)"
+          "tsp": "Target temperature (13–26 °C or 55–79 °F)",
+          "temp_unit": "Unit used to enter the Set Point (stored internally as °C)"
         }
       }
     },
@@ -54,7 +56,8 @@
           "recoverycalc_hour": "Heating stop hour",
           "sensor_interior_temperature": "Interior temperature sensor",
           "weather_entity": "Weather source (outdoor temperature)",
-          "tsp": "Set Point"
+          "tsp": "Set Point",
+          "temp_unit": "Temperature unit"
         },
         "data_description": {
           "name": "Integration name",
@@ -62,7 +65,8 @@
           "recoverycalc_hour": "Time when heating stops (e.g. 23:00)",
           "sensor_interior_temperature": "Room temperature sensor (e.g. sensor.room_temperature)",
           "weather_entity": "Weather integration providing outdoor temperature and wind speed (e.g. weather.home, weather.meteo_france).",
-          "tsp": "Target temperature (13-26°C)"
+          "tsp": "Target temperature (13–26 °C or 55–79 °F)",
+          "temp_unit": "Unit used to enter the Set Point (stored internally as °C)"
         }
       }
     }

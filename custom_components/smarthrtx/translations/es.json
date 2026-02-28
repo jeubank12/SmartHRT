@@ -20,13 +20,15 @@
           "target_hour": "Hora objetivo",
           "recoverycalc_hour": "Hora de apagado de calefacción",
           "sensor_interior_temperature": "Sensor de temperatura interior",
-          "tsp": "Temperatura deseada (Set Point)"
+          "tsp": "Temperatura deseada (Set Point)",
+          "temp_unit": "Unidad de temperatura"
         },
         "data_description": {
           "target_hour": "Hora de despertar deseada (ej: 6:00)",
           "recoverycalc_hour": "Hora de apagado de la calefacción por la noche (ej: 23:00)",
           "sensor_interior_temperature": "Sensor de temperatura de la habitación (ej: sensor.room_temperature)",
-          "tsp": "Temperatura deseada (13-26°C)"
+          "tsp": "Temperatura deseada (13–26 °C o 55–79 °F)",
+          "temp_unit": "Unidad para introducir el punto de ajuste (almacenado internamente en °C)"
         }
       }
     }

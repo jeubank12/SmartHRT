@@ -20,13 +20,15 @@
           "target_hour": "Ora obiettivo",
           "recoverycalc_hour": "Ora spegnimento riscaldamento",
           "sensor_interior_temperature": "Sensore temperatura interna",
-          "tsp": "Temperatura impostata (Set Point)"
+          "tsp": "Temperatura impostata (Set Point)",
+          "temp_unit": "Unità di temperatura"
         },
         "data_description": {
           "target_hour": "Ora di sveglia desiderata (es: 6:00)",
           "recoverycalc_hour": "Ora di spegnimento del riscaldamento la sera (es: 23:00)",
           "sensor_interior_temperature": "Sensore di temperatura della stanza (es: sensor.room_temperature)",
-          "tsp": "Temperatura desiderata (13-26°C)"
+          "tsp": "Temperatura desiderata (13–26 °C o 55–79 °F)",
+          "temp_unit": "Unità per inserire il punto di regolazione (memorizzato internamente in °C)"
         }
       }
     }
