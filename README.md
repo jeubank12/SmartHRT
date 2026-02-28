@@ -7,7 +7,9 @@
 
 ## 🙏 Acknowledgments
 
-**[@ebozonne](https://github.com/ebozonne)**: Author of the [original SmartHRT code](https://github.com/ebozonne/SmartHRT) on which this native integration is based
+**[@CorentinBarban](https://github.com/CorentinBarban)**: Author of [SmartHRT](https://github.com/CorentinBarban/SmartHRT), the native HA integration and polished UI that SmartHRTX is forked from. This fork adds small quality-of-life tweaks (e.g. °C/°F unit preference in the config form). A PR contributing the unit handling back upstream is planned.
+
+**[@ebozonne](https://github.com/ebozonne)**: Author of the [original SmartHRT script](https://github.com/ebozonne/SmartHRT) on which the native integration is based
 
 ## What is it?
 
