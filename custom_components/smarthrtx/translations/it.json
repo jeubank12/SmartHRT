@@ -20,15 +20,31 @@
           "target_hour": "Ora obiettivo",
           "recoverycalc_hour": "Ora spegnimento riscaldamento",
           "sensor_interior_temperature": "Sensore temperatura interna",
+          "weather_entity": "Fonte meteo (previsioni + condizioni di fallback)",
+          "sensor_outdoor_temperature": "Sensore temperatura esterna (sostituzione opzionale)",
+          "sensor_wind_speed": "Sensore velocità vento (sostituzione opzionale)",
           "tsp": "Temperatura impostata (Set Point)"
         },
         "data_description": {
           "target_hour": "Ora di sveglia desiderata (es: 6:00)",
           "recoverycalc_hour": "Ora di spegnimento del riscaldamento la sera (es: 23:00)",
           "sensor_interior_temperature": "Sensore di temperatura della stanza (es: sensor.room_temperature)",
-          "tsp": "Temperatura desiderata (13-26°C)"
+          "weather_entity": "Integrazione meteo usata per le previsioni orarie e come fallback per le condizioni attuali (es: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Se impostato, questo sensore sostituisce la temperatura attuale dell'entità meteo (es: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Se impostato, questo sensore sostituisce la velocità del vento attuale dell'entità meteo (es: sensor.ambient_wind_speed).",
+          "tsp": "Temperatura desiderata ({tsp_range})"
         }
       }
+    },
+    "error": {
+      "weather_not_found": "Entità meteo non trovata",
+      "weather_incompatible": "L'entità meteo non supporta le previsioni",
+      "sensor_not_found": "Sensore di temperatura non trovato",
+      "tsp_out_of_range": "Temperatura fuori intervallo (13–26 °C)",
+      "tsp_out_of_range_f": "Temperatura fuori intervallo (55–79 °F)",
+      "invalid_time_sequence": "L'ora di spegnimento deve precedere l'ora obiettivo",
+      "invalid_name": "Nome non valido",
+      "unknown_error": "Errore di configurazione"
     }
   },
   "options": {
@@ -42,6 +58,9 @@
           "target_hour": "Ora obiettivo",
           "recoverycalc_hour": "Ora spegnimento riscaldamento",
           "sensor_interior_temperature": "Sensore temperatura interna",
+          "weather_entity": "Fonte meteo (previsioni + condizioni di fallback)",
+          "sensor_outdoor_temperature": "Sensore temperatura esterna (sostituzione opzionale)",
+          "sensor_wind_speed": "Sensore velocità vento (sostituzione opzionale)",
           "tsp": "Temperatura impostata (Set Point)"
         },
         "data_description": {
@@ -49,15 +68,18 @@
           "target_hour": "Ora di sveglia desiderata (es: 6:00)",
           "recoverycalc_hour": "Ora di spegnimento del riscaldamento la sera (es: 23:00)",
           "sensor_interior_temperature": "Sensore di temperatura della stanza (es: sensor.room_temperature)",
-          "tsp": "Temperatura desiderata (13-26°C)"
+          "weather_entity": "Integrazione meteo usata per le previsioni orarie e come fallback per le condizioni attuali (es: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Se impostato, questo sensore sostituisce la temperatura attuale dell'entità meteo (es: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Se impostato, questo sensore sostituisce la velocità del vento attuale dell'entità meteo (es: sensor.ambient_wind_speed).",
+          "tsp": "Temperatura desiderata ({tsp_range})"
         }
       }
     }
   },
   "services": {
-    "calculate_recovery_time": {
-      "name": "Calcola ora di riavvio",
-      "description": "Calcola l'ora di avvio del riscaldamento in base ai parametri termici.",
+    "start_heating_cycle": {
+      "name": "Avvia ciclo di riscaldamento",
+      "description": "Avvia un nuovo ciclo di riscaldamento giornaliero, portando la macchina a stati in modalità HEATING_ON.",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -65,9 +87,9 @@
         }
       }
     },
-    "calculate_recovery_update_time": {
-      "name": "Calcola ora aggiornamento",
-      "description": "Calcola quando deve avvenire il prossimo aggiornamento del calcolo di riavvio.",
+    "stop_heating": {
+      "name": "Ferma riscaldamento",
+      "description": "Ferma il riscaldamento e avvia la fase di monitoraggio notturno (HEATING_ON → DETECTING_LAG → MONITORING).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -75,9 +97,9 @@
         }
       }
     },
-    "calculate_rcth_fast": {
-      "name": "Calcola RCth dinamico",
-      "description": "Calcola l'evoluzione dinamica di RCth prima dell'avvio del riscaldamento.",
+    "start_recovery": {
+      "name": "Avvia recupero",
+      "description": "Avvia la fase di recupero del riscaldamento per raggiungere la temperatura target all'ora di sveglia (MONITORING → RECOVERY).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -85,9 +107,9 @@
         }
       }
     },
-    "on_heating_stop": {
-      "name": "Arresto riscaldamento",
-      "description": "Attiva le azioni quando il riscaldamento si spegne (registra temperature e orari per i calcoli).",
+    "end_recovery": {
+      "name": "Termina recupero",
+      "description": "Termina la fase di recupero, calcola RPth e ritorna alla modalità di riscaldamento normale (HEATING_PROCESS → HEATING_ON).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -95,9 +117,9 @@
         }
       }
     },
-    "on_recovery_start": {
-      "name": "Inizio riavvio",
-      "description": "Attiva le azioni all'inizio del riavvio del riscaldamento (registra temperature e calcola RCth).",
+    "get_state": {
+      "name": "Ottieni stato",
+      "description": "Restituisce lo stato attuale della macchina a stati con tutti i dettagli (temperature, orari, coefficienti termici, modalità attive).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -105,9 +127,19 @@
         }
       }
     },
-    "on_recovery_end": {
-      "name": "Fine riavvio",
-      "description": "Attiva le azioni alla fine del riavvio del riscaldamento (registra temperature e calcola RPth).",
+    "reset_learning": {
+      "name": "Reimposta apprendimento",
+      "description": "Reimposta tutti i coefficienti termici appresi (RCth, RPth) ai loro valori predefiniti.",
+      "fields": {
+        "entry_id": {
+          "name": "ID configurazione",
+          "description": "L'ID della configurazione (opzionale, usa il primo disponibile se non specificato)."
+        }
+      }
+    },
+    "trigger_calculation": {
+      "name": "Attiva calcolo",
+      "description": "Attiva immediatamente un nuovo calcolo dell'ora di recupero.",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
