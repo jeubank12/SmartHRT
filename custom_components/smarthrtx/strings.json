@@ -210,7 +210,7 @@
           "detecting_lag": "Detecting Lag",
           "monitoring": "Monitoring",
           "recovery": "Recovery",
-          "heating_process": "Heating Up",
+          "heating_processing": "Heating Up",
           "unknown": "Unknown"
         }
       },

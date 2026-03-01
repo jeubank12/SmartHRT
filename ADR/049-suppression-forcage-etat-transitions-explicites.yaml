@@ -68,7 +68,7 @@ decision: |
       UNKNOWN = "unknown"            # État indéterminé (erreur)
       MONITORING = "monitoring"
       RECOVERY = "recovery"
-      HEATING_PROCESS = "heating_process"
+      HEATING_PROCESSING = "heating_processing"
       DETECTING_LAG = "detecting_lag"
   ```
 
@@ -79,7 +79,7 @@ decision: |
       SmartHRTState.INITIALIZING: {
           SmartHRTState.MONITORING,      # Démarrage normal
           SmartHRTState.RECOVERY,        # Recovery en cours lors du restart
-          SmartHRTState.HEATING_PROCESS, # Heating en cours lors du restart
+          SmartHRTState.HEATING_PROCESSING, # Heating en cours lors du restart
           SmartHRTState.DETECTING_LAG,   # Détection en cours lors du restart
           SmartHRTState.UNKNOWN,         # Erreur de restauration
       },

@@ -89,7 +89,7 @@ decision: |
       @classmethod
       def validate_state(cls, v):
           valid_states = {"heating_on", "detecting_lag", "monitoring", 
-                          "recovery", "heating_process"}
+                          "recovery", "heating_processing"}
           if v not in valid_states:
               return "heating_on"  # Fallback sécurisé
           return v

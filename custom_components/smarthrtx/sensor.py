@@ -324,7 +324,7 @@ class SmartHRTStateSensor(SmartHRTBaseSensor):
         "detecting_lag": "mdi:thermometer-minus",
         "monitoring": "mdi:eye",
         "recovery": "mdi:clock-fast",
-        "heating_process": "mdi:fire",
+        "heating_processing": "mdi:fire",
         "initializing": "mdi:loading",
     }
 
@@ -336,7 +336,7 @@ class SmartHRTStateSensor(SmartHRTBaseSensor):
         "detecting_lag",
         "monitoring",
         "recovery",
-        "heating_process",
+        "heating_processing",
         "unknown",
     ]
 

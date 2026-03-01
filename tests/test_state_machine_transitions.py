@@ -6,8 +6,8 @@ Ce module teste les transitions entre les 5 états du cycle thermique:
 1. HEATING_ON → DETECTING_LAG (à recoverycalc_hour)
 2. DETECTING_LAG → MONITORING (après détection baisse -0.2°C)
 3. MONITORING → RECOVERY (à recovery_start_hour)
-4. RECOVERY → HEATING_PROCESS (immédiat après calcul RCth)
-5. HEATING_PROCESS → HEATING_ON (atteinte TSP ou target_hour)
+4. RECOVERY → HEATING_PROCESSING (immédiat après calcul RCth)
+5. HEATING_PROCESSING → HEATING_ON (atteinte TSP ou target_hour)
 """
 
 from datetime import datetime, time as dt_time, timedelta
@@ -268,9 +268,9 @@ class TestTransitionMonitoringToRecovery:
 
             coord.on_recovery_start()
 
-            # Note: on_recovery_start passe par RECOVERY puis HEATING_PROCESS
+            # Note: on_recovery_start passe par RECOVERY puis HEATING_PROCESSING
             # On vérifie l'état final
-            assert coord.data.current_state == SmartHRTState.HEATING_PROCESS
+            assert coord.data.current_state == SmartHRTState.HEATING_PROCESSING
 
     @pytest.mark.asyncio
     async def test_transition_records_recovery_start_values(
@@ -322,16 +322,16 @@ class TestTransitionMonitoringToRecovery:
 
 
 class TestTransitionRecoveryToHeatingProcess:
-    """Tests pour la transition RECOVERY → HEATING_PROCESS.
+    """Tests pour la transition RECOVERY → HEATING_PROCESSING.
 
     Cette transition est immédiate après le calcul de RCth.
     """
 
     @pytest.mark.asyncio
-    async def test_recovery_transitions_immediately_to_heating_process(
+    async def test_recovery_transitions_immediately_to_heating_processing(
         self, create_coordinator
     ):
-        """Vérifie que RECOVERY passe immédiatement à HEATING_PROCESS."""
+        """Vérifie que RECOVERY passe immédiatement à HEATING_PROCESSING."""
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 30, 0)
             mock_dt.now.return_value = mock_now
@@ -341,14 +341,14 @@ class TestTransitionRecoveryToHeatingProcess:
                 time_recovery_calc=datetime(2026, 2, 3, 23, 5, 0),
             )
 
-            # on_recovery_start passe par RECOVERY puis HEATING_PROCESS
+            # on_recovery_start passe par RECOVERY puis HEATING_PROCESSING
             coord.on_recovery_start()
 
-            assert coord.data.current_state == SmartHRTState.HEATING_PROCESS
+            assert coord.data.current_state == SmartHRTState.HEATING_PROCESSING
 
 
 class TestTransitionHeatingProcessToHeatingOn:
-    """Tests pour la transition HEATING_PROCESS → HEATING_ON.
+    """Tests pour la transition HEATING_PROCESSING → HEATING_ON.
 
     Cette transition se produit quand:
     - La température intérieure atteint TSP, ou
@@ -356,12 +356,12 @@ class TestTransitionHeatingProcessToHeatingOn:
     """
 
     @pytest.fixture
-    def coordinator_heating_process(self, create_coordinator):
-        """Fixture pour un coordinator en état HEATING_PROCESS."""
+    def coordinator_heating_processing(self, create_coordinator):
+        """Fixture pour un coordinator en état HEATING_PROCESSING."""
 
         async def _setup():
             coord = await create_coordinator(
-                initial_state=SmartHRTState.HEATING_PROCESS,
+                initial_state=SmartHRTState.HEATING_PROCESSING,
                 rp_calc_mode=True,
                 tsp=DEFAULT_TSP,  # 19.0°C
                 interior_temp=18.0,
@@ -373,15 +373,15 @@ class TestTransitionHeatingProcessToHeatingOn:
         return _setup
 
     @pytest.mark.asyncio
-    async def test_transition_on_tsp_reached(self, coordinator_heating_process):
+    async def test_transition_on_tsp_reached(self, coordinator_heating_processing):
         """Vérifie la transition vers HEATING_ON quand TSP est atteint."""
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
-            coord = await coordinator_heating_process()
+            coord = await coordinator_heating_processing()
             coord.data.tsp = 19.0
-            # ADR-040: flag calculé depuis state (HEATING_PROCESS → True)
+            # ADR-040: flag calculé depuis state (HEATING_PROCESSING → True)
 
             # Température atteint la consigne
             coord.data.interior_temp = 19.0
@@ -391,15 +391,15 @@ class TestTransitionHeatingProcessToHeatingOn:
             assert coord.data.current_state == SmartHRTState.HEATING_ON
 
     @pytest.mark.asyncio
-    async def test_transition_on_tsp_exceeded(self, coordinator_heating_process):
+    async def test_transition_on_tsp_exceeded(self, coordinator_heating_processing):
         """Vérifie la transition quand la température dépasse TSP."""
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
-            coord = await coordinator_heating_process()
+            coord = await coordinator_heating_processing()
             coord.data.tsp = 19.0
-            # ADR-040: flag calculé depuis state (HEATING_PROCESS → True)
+            # ADR-040: flag calculé depuis state (HEATING_PROCESSING → True)
 
             # Température dépasse la consigne
             coord.data.interior_temp = 19.5
@@ -409,29 +409,29 @@ class TestTransitionHeatingProcessToHeatingOn:
             assert coord.data.current_state == SmartHRTState.HEATING_ON
 
     @pytest.mark.asyncio
-    async def test_no_transition_if_tsp_not_reached(self, coordinator_heating_process):
+    async def test_no_transition_if_tsp_not_reached(self, coordinator_heating_processing):
         """Vérifie qu'il n'y a pas de transition si TSP non atteint."""
-        coord = await coordinator_heating_process()
+        coord = await coordinator_heating_processing()
         coord.data.tsp = 19.0
-        # ADR-040: flag calculé depuis state (HEATING_PROCESS → True)
+        # ADR-040: flag calculé depuis state (HEATING_PROCESSING → True)
         coord.data.interior_temp = 18.5
 
         coord._check_temperature_thresholds()
 
-        assert coord.data.current_state == SmartHRTState.HEATING_PROCESS
+        assert coord.data.current_state == SmartHRTState.HEATING_PROCESSING
 
     @pytest.mark.asyncio
     async def test_transition_deactivates_rp_calc_mode(
-        self, coordinator_heating_process
+        self, coordinator_heating_processing
     ):
         """Vérifie que rp_calc_mode est désactivé après la transition."""
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
-            coord = await coordinator_heating_process()
+            coord = await coordinator_heating_processing()
             coord.data.tsp = 19.0
-            # ADR-040: flag calculé depuis state (HEATING_PROCESS → True)
+            # ADR-040: flag calculé depuis state (HEATING_PROCESSING → True)
             coord.data.interior_temp = 19.0
 
             coord._check_temperature_thresholds()
@@ -440,16 +440,16 @@ class TestTransitionHeatingProcessToHeatingOn:
 
     @pytest.mark.asyncio
     async def test_transition_records_recovery_end_values(
-        self, coordinator_heating_process
+        self, coordinator_heating_processing
     ):
         """Vérifie que les valeurs de fin de relance sont enregistrées."""
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 5, 55, 0)
             mock_dt.now.return_value = mock_now
 
-            coord = await coordinator_heating_process()
+            coord = await coordinator_heating_processing()
             coord.data.tsp = 19.0
-            # ADR-040: flag calculé depuis state (HEATING_PROCESS → True)
+            # ADR-040: flag calculé depuis state (HEATING_PROCESSING → True)
             coord.data.interior_temp = 19.0
             coord.data.exterior_temp = 4.5
 
@@ -460,15 +460,15 @@ class TestTransitionHeatingProcessToHeatingOn:
             assert coord.data.time_recovery_end == mock_now
 
     @pytest.mark.asyncio
-    async def test_transition_on_target_hour(self, coordinator_heating_process):
+    async def test_transition_on_target_hour(self, coordinator_heating_processing):
         """Vérifie la transition à target_hour même si TSP non atteint."""
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_now = datetime(2026, 2, 4, 6, 0, 0)
             mock_dt.now.return_value = mock_now
 
-            coord = await coordinator_heating_process()
+            coord = await coordinator_heating_processing()
             coord.data.tsp = 19.0
-            # ADR-040: flag calculé depuis state (HEATING_PROCESS → True)
+            # ADR-040: flag calculé depuis state (HEATING_PROCESSING → True)
             coord.data.interior_temp = 18.5  # TSP non atteint
 
             # Simuler l'appel à on_recovery_end (déclenché par target_hour)
@@ -486,7 +486,7 @@ class TestInvalidTransitions:
     ):
         """Vérifie que on_recovery_start est ignoré si déjà en RECOVERY.
 
-        ADR-040: rp_calc_mode est une propriété calculée (True ssi HEATING_PROCESS).
+        ADR-040: rp_calc_mode est une propriété calculée (True ssi HEATING_PROCESSING).
         """
         coord = await create_coordinator(
             initial_state=SmartHRTState.RECOVERY,
@@ -497,7 +497,7 @@ class TestInvalidTransitions:
         # Simuler ce comportement
         if coord.data.current_state in (
             SmartHRTState.RECOVERY,
-            SmartHRTState.HEATING_PROCESS,
+            SmartHRTState.HEATING_PROCESSING,
         ):
             # Ne devrait pas re-déclencher
             pass
@@ -509,9 +509,9 @@ class TestInvalidTransitions:
     async def test_recovery_end_ignored_if_not_in_rp_calc_mode(
         self, create_coordinator
     ):
-        """Vérifie que on_recovery_end est ignoré si pas en HEATING_PROCESS.
+        """Vérifie que on_recovery_end est ignoré si pas en HEATING_PROCESSING.
 
-        ADR-040: rp_calc_mode est une propriété calculée (True ssi HEATING_PROCESS).
+        ADR-040: rp_calc_mode est une propriété calculée (True ssi HEATING_PROCESSING).
         """
         coord = await create_coordinator(
             initial_state=SmartHRTState.MONITORING,  # rp_calc_mode sera False
@@ -569,11 +569,11 @@ class TestModeFlags:
         assert coord.data.rp_calc_mode is False
 
     @pytest.mark.asyncio
-    async def test_heating_process_mode_flags(self, create_coordinator):
-        """Vérifie les flags en état HEATING_PROCESS."""
-        coord = await create_coordinator(initial_state=SmartHRTState.HEATING_PROCESS)
+    async def test_heating_processing_mode_flags(self, create_coordinator):
+        """Vérifie les flags en état HEATING_PROCESSING."""
+        coord = await create_coordinator(initial_state=SmartHRTState.HEATING_PROCESSING)
 
-        # ADR-040: En HEATING_PROCESS, rp_calc_mode est True (calculé depuis state)
+        # ADR-040: En HEATING_PROCESSING, rp_calc_mode est True (calculé depuis state)
         assert coord.data.rp_calc_mode is True
         assert coord.data.recovery_calc_mode is False
         assert coord.data.temp_lag_detection_active is False

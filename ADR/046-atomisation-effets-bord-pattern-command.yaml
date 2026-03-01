@@ -22,8 +22,8 @@ context: |
           self._execute_actions(actions)  # Facile à oublier !
       
       # Et parfois il y a du code spécifique en plus...
-      if not self.transition_to(SmartHRTState.HEATING_PROCESS):
-          self.force_state(SmartHRTState.HEATING_PROCESS)
+      if not self.transition_to(SmartHRTState.HEATING_PROCESSING):
+          self.force_state(SmartHRTState.HEATING_PROCESSING)
       
       # Et encore plus de logique manuelle...
       self.async_set_updated_data(self.data)
@@ -81,12 +81,12 @@ decision: |
           Action.CALCULATE_RCTH,
           Action.SAVE_DATA,
       ],
-      # RECOVERY → HEATING_PROCESS
-      (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS): [
+      # RECOVERY → HEATING_PROCESSING
+      (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESSING): [
           # Pas d'action supplémentaire, le snapshot est déjà fait
       ],
-      # HEATING_PROCESS → HEATING_ON
-      (SmartHRTState.HEATING_PROCESS, SmartHRTState.HEATING_ON): [
+      # HEATING_PROCESSING → HEATING_ON
+      (SmartHRTState.HEATING_PROCESSING, SmartHRTState.HEATING_ON): [
           Action.SNAPSHOT_RECOVERY_END,
           Action.CALCULATE_RPTH,
           Action.SAVE_DATA,
@@ -148,8 +148,8 @@ decision: |
           self.force_state(SmartHRTState.RECOVERY)
           self._execute_actions([Action.CALCULATE_RCTH, Action.SAVE_DATA])
       
-      # Transition immédiate vers HEATING_PROCESS
-      result2 = self._state_machine.transition_with_actions(SmartHRTState.HEATING_PROCESS)
+      # Transition immédiate vers HEATING_PROCESSING
+      result2 = self._state_machine.transition_with_actions(SmartHRTState.HEATING_PROCESSING)
       if result2.success:
           self._execute_actions(result2.actions)
       

@@ -18,7 +18,7 @@ context: |
           translations = {
               SmartHRTState.MONITORING: "Surveillance",
               SmartHRTState.RECOVERY: "Récupération en cours",
-              SmartHRTState.HEATING_PROCESS: "Chauffage actif",
+              SmartHRTState.HEATING_PROCESSING: "Chauffage actif",
               SmartHRTState.DETECTING_LAG: "Détection inertie",
           }
           return translations.get(state, str(state))
@@ -100,7 +100,7 @@ decision: |
             "initializing": "Initializing",
             "monitoring": "Monitoring",
             "recovery": "Recovery in progress",
-            "heating_process": "Heating active",
+            "heating_processing": "Heating active",
             "detecting_lag": "Detecting thermal lag",
             "unknown": "Unknown"
           }
@@ -148,7 +148,7 @@ decision: |
             "initializing": "Initialisation",
             "monitoring": "Surveillance",
             "recovery": "Récupération en cours",
-            "heating_process": "Chauffage actif",
+            "heating_processing": "Chauffage actif",
             "detecting_lag": "Détection de l'inertie",
             "unknown": "Inconnu"
           }

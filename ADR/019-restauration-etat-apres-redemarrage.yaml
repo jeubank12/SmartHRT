@@ -23,9 +23,9 @@ context: |
   **État RECOVERY (État 4) :**
   - État transitoire très court (quelques secondes) ❌
   - Si HA redémarre pendant ces secondes, l'instance reste bloquée en RECOVERY
-  - Pas de mécanisme pour passer automatiquement à HEATING_PROCESS
+  - Pas de mécanisme pour passer automatiquement à HEATING_PROCESSING
 
-  **État HEATING_PROCESS (État 5) :**
+  **État HEATING_PROCESSING (État 5) :**
   - La surveillance de TSP était active (via _check_temperature_thresholds) ✅
   - Mais si target_hour était dépassée pendant le redémarrage, on_recovery_end() 
     n'était jamais appelé ❌
@@ -58,7 +58,7 @@ decision: |
   configurées (target_hour, recoverycalc_hour, recovery_start_hour):
   - target_hour → recoverycalc_hour : HEATING_ON (jour)
   - recoverycalc_hour → recovery_start_hour : MONITORING (nuit)
-  - recovery_start_hour → target_hour : HEATING_PROCESS (relance)
+  - recovery_start_hour → target_hour : HEATING_PROCESSING (relance)
 
   **Méthode _transition_to_expected_state() :**
   Force la transition vers l'état attendu en configurant correctement tous les
@@ -76,11 +76,11 @@ decision: |
      - Si dépassé, appeler immédiatement on_recovery_start()
 
   3. **RECOVERY** (état transitoire) :
-     - Passer directement à HEATING_PROCESS
+     - Passer directement à HEATING_PROCESSING
      - Activer rp_calc_mode
      - Sauvegarder l'état
 
-  4. **HEATING_PROCESS** :
+  4. **HEATING_PROCESSING** :
      - Vérifier si target_hour est dépassée
      - Si oui, appeler immédiatement on_recovery_end()
      - Sinon, la surveillance automatique prend le relais
@@ -149,7 +149,7 @@ implementation_details: |
   **Gestion des triggers dépassés :**
   - Si recovery_update_hour est dans le passé → recalcul immédiat
   - Si recovery_start_hour est dans le passé → démarrage immédiat de la relance
-  - Si target_hour est dans le passé en mode HEATING_PROCESS → fin de relance immédiate
+  - Si target_hour est dans le passé en mode HEATING_PROCESSING → fin de relance immédiate
 
 test_scenarios:
   - scenario: "Redémarrage pendant MONITORING avant recovery_start_hour"
@@ -157,10 +157,10 @@ test_scenarios:
   - scenario: "Redémarrage pendant MONITORING après recovery_start_hour"
     expected: "on_recovery_start() appelé immédiatement"
   - scenario: "Redémarrage pendant RECOVERY"
-    expected: "Transition automatique vers HEATING_PROCESS"
-  - scenario: "Redémarrage pendant HEATING_PROCESS avant target_hour"
+    expected: "Transition automatique vers HEATING_PROCESSING"
+  - scenario: "Redémarrage pendant HEATING_PROCESSING avant target_hour"
     expected: "Surveillance TSP continue normalement"
-  - scenario: "Redémarrage pendant HEATING_PROCESS après target_hour"
+  - scenario: "Redémarrage pendant HEATING_PROCESSING après target_hour"
     expected: "on_recovery_end() appelé immédiatement"
   - scenario: "Redémarrage avec état corrompu"
     expected: "Warning logué et réinitialisation à HEATING_ON"
@@ -169,7 +169,7 @@ test_scenarios:
   - scenario: "État HEATING_ON persisté mais il est 2h du matin"
     expected: "Correction automatique vers MONITORING, calculs RCth démarrés"
   - scenario: "État HEATING_ON persisté mais il est 5h30 (après recovery_start)"
-    expected: "Correction automatique vers HEATING_PROCESS, rp_calc_mode activé"
+    expected: "Correction automatique vers HEATING_PROCESSING, rp_calc_mode activé"
 
 examples: |
   **Logs lors d'une restauration en état MONITORING (cohérent) :**
@@ -198,6 +198,6 @@ examples: |
   **Logs lors d'une restauration en état RECOVERY (rare) :**
   ```
   [Bureau#f7g8h9i0] Restauration après redémarrage - État persisté: recovery, État attendu (heure): heating_process
-  [Bureau#f7g8h9i0] État RECOVERY restauré pendant redémarrage - Passage à HEATING_PROCESS
+  [Bureau#f7g8h9i0] État RECOVERY restauré pendant redémarrage - Passage à HEATING_PROCESSING
   [Bureau#f7g8h9i0] Données apprises et état sauvegardés en stockage
   ```

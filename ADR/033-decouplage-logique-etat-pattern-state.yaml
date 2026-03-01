@@ -78,13 +78,13 @@ decision: |
       def __init__(self, ...):
           self._state_machine = SmartHRTStateMachine()
           # Enregistrer les callbacks
-          self._state_machine.on_enter(SmartHRTState.HEATING_PROCESS, self._handle_enter_heating)
+          self._state_machine.on_enter(SmartHRTState.HEATING_PROCESSING, self._handle_enter_heating)
           self._state_machine.on_exit(SmartHRTState.MONITORING, self._handle_exit_monitoring)
       
       async def _handle_temperature_change(self, new_temp: float):
           """Orchestration : événement HA -> machine -> actions."""
           if self._should_start_recovery(new_temp):
-              self._state_machine.transition_to(SmartHRTState.HEATING_PROCESS)
+              self._state_machine.transition_to(SmartHRTState.HEATING_PROCESSING)
               # Les callbacks font le reste
   ```
 

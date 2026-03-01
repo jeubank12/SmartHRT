@@ -29,8 +29,8 @@ class TestFullDayCycle:
     1. 10:00 - HEATING_ON (journée)
     2. 23:00 - HEATING_ON → DETECTING_LAG (recoverycalc_hour)
     3. 23:10 - DETECTING_LAG → MONITORING (baisse de 0.2°C)
-    4. 05:30 - MONITORING → RECOVERY → HEATING_PROCESS (recovery_start)
-    5. 05:55 - HEATING_PROCESS → HEATING_ON (TSP atteint)
+    4. 05:30 - MONITORING → RECOVERY → HEATING_PROCESSING (recovery_start)
+    5. 05:55 - HEATING_PROCESSING → HEATING_ON (TSP atteint)
     """
 
     @pytest.mark.asyncio
@@ -77,7 +77,7 @@ class TestFullDayCycle:
             states_sequence.append(coord.data.current_state)
             assert coord.data.current_state == SmartHRTState.MONITORING
 
-        # Étape 4: Démarrage relance - HEATING_PROCESS (05:30)
+        # Étape 4: Démarrage relance - HEATING_PROCESSING (05:30)
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 5, 30, 0)
 
@@ -87,7 +87,7 @@ class TestFullDayCycle:
             coord.on_recovery_start()
 
             states_sequence.append(coord.data.current_state)
-            assert coord.data.current_state == SmartHRTState.HEATING_PROCESS
+            assert coord.data.current_state == SmartHRTState.HEATING_PROCESSING
 
         # Étape 5: Consigne atteinte - HEATING_ON (05:55)
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
@@ -105,7 +105,7 @@ class TestFullDayCycle:
             SmartHRTState.HEATING_ON,
             SmartHRTState.DETECTING_LAG,
             SmartHRTState.MONITORING,
-            SmartHRTState.HEATING_PROCESS,
+            SmartHRTState.HEATING_PROCESSING,
             SmartHRTState.HEATING_ON,
         ]
         assert states_sequence == expected_sequence
@@ -152,7 +152,7 @@ class TestEdgeCases:
             mock_dt.now.return_value = datetime(2026, 2, 4, 6, 0, 0)
 
             coord = await create_coordinator(
-                initial_state=SmartHRTState.HEATING_PROCESS,
+                initial_state=SmartHRTState.HEATING_PROCESSING,
                 rp_calc_mode=True,
                 tsp=DEFAULT_TSP,
                 interior_temp=18.0,  # En dessous de TSP
@@ -184,13 +184,13 @@ class TestEdgeCases:
             assert coord.data.current_state == SmartHRTState.HEATING_ON
 
     @pytest.mark.asyncio
-    async def test_recovery_start_already_in_heating_process(self, create_coordinator):
-        """Test: on_recovery_start ignoré si déjà en HEATING_PROCESS."""
+    async def test_recovery_start_already_in_heating_processing(self, create_coordinator):
+        """Test: on_recovery_start ignoré si déjà en HEATING_PROCESSING."""
         with patch("custom_components.smarthrtx.coordinator.dt_util") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 2, 4, 5, 35, 0)
 
             coord = await create_coordinator(
-                initial_state=SmartHRTState.HEATING_PROCESS,
+                initial_state=SmartHRTState.HEATING_PROCESSING,
                 rp_calc_mode=True,
                 time_recovery_start=datetime(2026, 2, 4, 5, 30, 0),
             )
@@ -198,14 +198,14 @@ class TestEdgeCases:
             # Le callback vérifie l'état avant d'appeler on_recovery_start
             if coord.data.current_state in (
                 SmartHRTState.RECOVERY,
-                SmartHRTState.HEATING_PROCESS,
+                SmartHRTState.HEATING_PROCESSING,
             ):
                 pass  # Ignoré
             else:
                 coord.on_recovery_start()
 
-            # L'état reste HEATING_PROCESS
-            assert coord.data.current_state == SmartHRTState.HEATING_PROCESS
+            # L'état reste HEATING_PROCESSING
+            assert coord.data.current_state == SmartHRTState.HEATING_PROCESSING
 
     @pytest.mark.asyncio
     async def test_multiple_temperature_decreases(self, create_coordinator):
@@ -246,7 +246,7 @@ class TestModeInteractions:
             mock_dt.now.return_value = datetime(2026, 2, 4, 6, 0, 0)
 
             coord = await create_coordinator(
-                initial_state=SmartHRTState.HEATING_PROCESS,
+                initial_state=SmartHRTState.HEATING_PROCESSING,
                 rp_calc_mode=True,
                 recovery_adaptive_mode=True,
                 time_recovery_start=datetime(2026, 2, 4, 5, 0, 0),
@@ -268,10 +268,10 @@ class TestModeInteractions:
 
     @pytest.mark.asyncio
     async def test_rp_calc_mode_required_for_recovery_end(self, create_coordinator):
-        """Test: on_recovery_end ne fait rien si pas en état HEATING_PROCESS.
+        """Test: on_recovery_end ne fait rien si pas en état HEATING_PROCESSING.
 
         ADR-040: rp_calc_mode est une propriété calculée depuis current_state.
-        rp_calc_mode == True ssi current_state == HEATING_PROCESS.
+        rp_calc_mode == True ssi current_state == HEATING_PROCESSING.
         """
         coord = await create_coordinator(
             initial_state=SmartHRTState.HEATING_ON,  # rp_calc_mode sera False
@@ -279,7 +279,7 @@ class TestModeInteractions:
 
         coord.on_recovery_end()
 
-        # L'état ne change pas si pas en HEATING_PROCESS (rp_calc_mode == False)
+        # L'état ne change pas si pas en HEATING_PROCESSING (rp_calc_mode == False)
         assert coord.data.current_state == SmartHRTState.HEATING_ON
 
 
@@ -313,7 +313,7 @@ class TestTemperatureThresholds:
             mock_dt.now.return_value = datetime(2026, 2, 4, 5, 55, 0)
 
             coord = await create_coordinator(
-                initial_state=SmartHRTState.HEATING_PROCESS,
+                initial_state=SmartHRTState.HEATING_PROCESSING,
                 rp_calc_mode=True,
                 tsp=19.0,
                 time_recovery_start=datetime(2026, 2, 4, 5, 0, 0),
@@ -387,7 +387,7 @@ class TestStateDataConsistency:
             mock_dt.now.return_value = expected_time
 
             coord = await create_coordinator(
-                initial_state=SmartHRTState.HEATING_PROCESS,
+                initial_state=SmartHRTState.HEATING_PROCESSING,
                 rp_calc_mode=True,
                 time_recovery_start=datetime(2026, 2, 4, 5, 30, 0),
             )

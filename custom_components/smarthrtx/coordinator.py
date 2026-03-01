@@ -169,7 +169,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         self._state_machine.on_enter(SmartHRTState.MONITORING, self._on_state_entered)
         self._state_machine.on_enter(SmartHRTState.RECOVERY, self._on_state_entered)
         self._state_machine.on_enter(
-            SmartHRTState.HEATING_PROCESS, self._on_state_entered
+            SmartHRTState.HEATING_PROCESSINGING, self._on_state_entered
         )
 
         self._interior_temp_sensor_id = entry.data.get(CONF_SENSOR_INTERIOR_TEMP)
@@ -901,10 +901,10 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         if not self.data.smartheating_mode:
             return
 
-        # Avoid triggering if already in RECOVERY or HEATING_PROCESS
+        # Avoid triggering if already in RECOVERY or HEATING_PROCESSING
         if self.data.current_state in (
             SmartHRTState.RECOVERY,
-            SmartHRTState.HEATING_PROCESS,
+            SmartHRTState.HEATING_PROCESSINGING,
         ):
             _LOGGER.debug(
                 "%s Heating start skipped, already in state %s",
@@ -1565,7 +1565,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         Règles simplifiées :
         1. HEATING_ON est toujours valide (état par défaut sûr)
         2. MONITORING/DETECTING_LAG sont valides la nuit (après recoverycalc, avant target)
-        3. RECOVERY/HEATING_PROCESS sont valides si recovery_start_hour <= now < target
+        3. RECOVERY/HEATING_PROCESSING sont valides si recovery_start_hour <= now < target
 
         Args:
             persisted_state: État lu depuis la persistance
@@ -1592,8 +1592,8 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         if persisted_state in (SmartHRTState.MONITORING, SmartHRTState.DETECTING_LAG):
             return is_night
 
-        # RECOVERY/HEATING_PROCESS valides pendant la période de relance
-        if persisted_state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS):
+        # RECOVERY/HEATING_PROCESSING valides pendant la période de relance
+        if persisted_state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESSINGING):
             if not self.data.recovery_start_hour:
                 return False  # Pas de recovery_start_hour = incohérent
             # Valide si : recovery_start_hour <= now ET current_time < target
@@ -1625,7 +1625,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
             # La surveillance de température reprendra automatiquement
             pass
 
-        elif state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS):
+        elif state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESSINGING):
             # Vérifier si target_hour est dépassée
             if not self.data.target_hour:
                 return
@@ -1703,7 +1703,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         """Appelé au début de la relance
         Équivalent de l'automation 'boostTIME' du YAML
 
-        Transition: MONITORING → RECOVERY → HEATING_PROCESS (État 3 → État 4 → État 5)
+        Transition: MONITORING → RECOVERY → HEATING_PROCESSING (État 3 → État 4 → État 5)
         """
         # Transition vers RECOVERY (État 4)
         now = dt_util.now()
@@ -1731,10 +1731,10 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         if pre_actions:
             self._execute_actions(pre_actions)
 
-        # Transition vers HEATING_PROCESS (État 5) - chauffage en cours
-        if not self.transition_to(SmartHRTState.HEATING_PROCESS):
-            self.force_state(SmartHRTState.HEATING_PROCESS)
-        _LOGGER.debug("%s Transition vers état HEATING_PROCESS", self._log_prefix())
+        # Transition vers HEATING_PROCESSING (État 5) - chauffage en cours
+        if not self.transition_to(SmartHRTState.HEATING_PROCESSINGING):
+            self.force_state(SmartHRTState.HEATING_PROCESSINGING)
+        _LOGGER.debug("%s Transition vers état HEATING_PROCESSING", self._log_prefix())
 
         if Action.SAVE_DATA in actions:
             self._execute_actions([Action.SAVE_DATA])
@@ -1752,7 +1752,7 @@ class SmartHRTCoordinator(DataUpdateCoordinator[SmartHRTData]):
         """Appelé à la fin de la relance (consigne atteinte ou target_hour)
         Équivalent de l'automation 'recoveryendTIME' du YAML
 
-        Transition: HEATING_PROCESS → HEATING_ON (État 5 → État 1)
+        Transition: HEATING_PROCESSING → HEATING_ON (État 5 → État 1)
         """
         if not self.data.rp_calc_mode:
             return

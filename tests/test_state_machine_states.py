@@ -28,9 +28,9 @@ class TestSmartHRTStateDefinition:
         """Vérifie que l'état RECOVERY a la bonne valeur."""
         assert SmartHRTState.RECOVERY == "recovery"
 
-    def test_state_heating_process_value(self):
-        """Vérifie que l'état HEATING_PROCESS a la bonne valeur."""
-        assert SmartHRTState.HEATING_PROCESS == "heating_process"
+    def test_state_heating_processing_value(self):
+        """Vérifie que l'état HEATING_PROCESSING a la bonne valeur."""
+        assert SmartHRTState.HEATING_PROCESSING == "heating_processinging"
 
     def test_all_states_are_unique(self):
         """Vérifie que tous les états sont uniques."""
@@ -39,7 +39,7 @@ class TestSmartHRTStateDefinition:
             SmartHRTState.DETECTING_LAG,
             SmartHRTState.MONITORING,
             SmartHRTState.RECOVERY,
-            SmartHRTState.HEATING_PROCESS,
+            SmartHRTState.HEATING_PROCESSING,
         ]
         assert len(states) == len(set(states))
 
@@ -50,7 +50,7 @@ class TestSmartHRTStateDefinition:
             SmartHRTState.DETECTING_LAG,
             SmartHRTState.MONITORING,
             SmartHRTState.RECOVERY,
-            SmartHRTState.HEATING_PROCESS,
+            SmartHRTState.HEATING_PROCESSING,
         ]
         for state in states:
             assert isinstance(state, str)
@@ -60,7 +60,7 @@ class TestStateCycleOrder:
     """Tests pour le cycle de vie des états selon l'ADR-003.
 
     Cycle attendu:
-    HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESS → HEATING_ON
+    HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESSING → HEATING_ON
     """
 
     def test_state_cycle_definition(self):
@@ -70,7 +70,7 @@ class TestStateCycleOrder:
             SmartHRTState.DETECTING_LAG,  # État 2: Attente baisse température
             SmartHRTState.MONITORING,  # État 3: Surveillance nocturne
             SmartHRTState.RECOVERY,  # État 4: Moment de la relance
-            SmartHRTState.HEATING_PROCESS,  # État 5: Montée en température
+            SmartHRTState.HEATING_PROCESSING,  # État 5: Montée en température
             # Retour à HEATING_ON
         ]
         assert len(expected_cycle) == 5
@@ -98,6 +98,6 @@ class TestStateCycleOrder:
         """État 4: RECOVERY - Instant de la relance, calcul RCth."""
         assert SmartHRTState.RECOVERY == "recovery"
 
-    def test_state_5_is_heating_process(self):
-        """État 5: HEATING_PROCESS - Montée en température, calcul RPth."""
-        assert SmartHRTState.HEATING_PROCESS == "heating_process"
+    def test_state_5_is_heating_processing(self):
+        """État 5: HEATING_PROCESSING - Montée en température, calcul RPth."""
+        assert SmartHRTState.HEATING_PROCESSING == "heating_processinging"

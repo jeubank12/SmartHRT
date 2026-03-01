@@ -128,7 +128,7 @@ recoverycalc_hour (e.g. 23:00)
   Your automation: climate.set_temperature fires (from sensor trigger)
 
 target_hour (e.g. 06:00)
-  SmartHRTX: RECOVERY → HEATING_PROCESS → HEATING_ON
+  SmartHRTX: RECOVERY → HEATING_PROCESSING → HEATING_ON
   RPth updated and saved. Cycle complete.
 ```
 

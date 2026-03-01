@@ -192,7 +192,7 @@
           "detecting_lag": "Détection lag",
           "monitoring": "Surveillance",
           "recovery": "Relance",
-          "heating_process": "Montée en température",
+          "heating_processing": "Montée en température",
           "unknown": "Inconnu"
         }
       },

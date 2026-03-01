@@ -13,7 +13,7 @@ context: |
   ```python
   def on_recovery_start(self) -> None:
       # Étape 1 : mutation de l'état
-      self.data.current_state = SmartHRTState.HEATING_PROCESS
+      self.data.current_state = SmartHRTState.HEATING_PROCESSING
       self.data.recovery_calc_mode = False
       
       # Étape 2 : mutation des timestamps
@@ -72,7 +72,7 @@ decision: |
       # Création atomique du nouvel état
       new_data = replace(
           current_data,
-          current_state=SmartHRTState.HEATING_PROCESS,
+          current_state=SmartHRTState.HEATING_PROCESSING,
           recovery_calc_mode=False,
           rp_calc_mode=True,
           time_recovery_start=now,

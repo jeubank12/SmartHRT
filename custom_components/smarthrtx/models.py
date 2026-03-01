@@ -84,7 +84,7 @@ class PersistedDataModel(BaseModel):
             "detecting_lag",
             "monitoring",
             "recovery",
-            "heating_process",
+            "heating_processing",
         }
         if v not in valid_states:
             _LOGGER.warning("État invalide '%s', utilisation de 'heating_on'", v)

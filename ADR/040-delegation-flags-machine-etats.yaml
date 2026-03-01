@@ -9,7 +9,7 @@ context: |
 
   **Drapeaux concernés :**
   - `recovery_calc_mode` : Actif pendant MONITORING (calculs de refroidissement)
-  - `rp_calc_mode` : Actif pendant HEATING_PROCESS (calculs de relance)
+  - `rp_calc_mode` : Actif pendant HEATING_PROCESSING (calculs de relance)
   - `temp_lag_detection_active` : Actif pendant DETECTING_LAG
 
   **Code problématique (exemples) :**
@@ -27,7 +27,7 @@ context: |
   self.data.temp_lag_detection_active = False  # MANIPULATION MANUELLE
 
   # Dans on_recovery_start (ligne 1738)
-  # ... transition vers RECOVERY puis HEATING_PROCESS
+  # ... transition vers RECOVERY puis HEATING_PROCESSING
   # Les flags sont censés être gérés par _apply_state_transition_with_actions
   # mais le code vérifie manuellement et ajuste
   ```
@@ -42,7 +42,7 @@ context: |
           SmartHRTState.DETECTING_LAG: {"recovery_calc_mode": False, "rp_calc_mode": False, "temp_lag_detection_active": True},
           SmartHRTState.MONITORING: {"recovery_calc_mode": True, "rp_calc_mode": False, "temp_lag_detection_active": False},
           SmartHRTState.RECOVERY: {"recovery_calc_mode": False, "rp_calc_mode": False, "temp_lag_detection_active": False},
-          SmartHRTState.HEATING_PROCESS: {"recovery_calc_mode": False, "rp_calc_mode": True, "temp_lag_detection_active": False},
+          SmartHRTState.HEATING_PROCESSING: {"recovery_calc_mode": False, "rp_calc_mode": True, "temp_lag_detection_active": False},
       }
       return flags.get(state, {})
   ```
@@ -109,7 +109,7 @@ decision: |
       
       @property
       def rp_calc_mode(self) -> bool:
-          return self.current_state == SmartHRTState.HEATING_PROCESS
+          return self.current_state == SmartHRTState.HEATING_PROCESSING
       
       @property
       def temp_lag_detection_active(self) -> bool:

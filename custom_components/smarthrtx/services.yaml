@@ -43,7 +43,7 @@ start_recovery:
   description: >
     Démarre la phase de relance du chauffage pour atteindre la température cible 
     à l'heure de réveil. Calcule automatiquement RCth et active le calcul de RPth.
-    Transitions: MONITORING → RECOVERY → HEATING_PROCESS.
+    Transitions: MONITORING → RECOVERY → HEATING_PROCESSING.
   fields:
     entry_id:
       name: Entry ID
@@ -61,7 +61,7 @@ end_recovery:
   description: >
     Termine la phase de relance (consigne atteinte ou heure cible atteinte).
     Calcule RPth et retourne en mode chauffage normal.
-    Transition: HEATING_PROCESS → HEATING_ON.
+    Transition: HEATING_PROCESSING → HEATING_ON.
   fields:
     entry_id:
       name: Entry ID

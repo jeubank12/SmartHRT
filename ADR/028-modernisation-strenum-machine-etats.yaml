@@ -11,7 +11,7 @@ context: |
       DETECTING_LAG = "detecting_lag"
       MONITORING = "monitoring"
       RECOVERY = "recovery"
-      HEATING_PROCESS = "heating_process"
+      HEATING_PROCESSING = "heating_processing"
   ```
 
   Cette approche présente des limitations :
@@ -38,7 +38,7 @@ decision: |
       DETECTING_LAG = "detecting_lag"
       MONITORING = "monitoring"
       RECOVERY = "recovery"
-      HEATING_PROCESS = "heating_process"
+      HEATING_PROCESSING = "heating_processing"
   ```
 
   Avantages :
@@ -57,8 +57,8 @@ decision: |
       SmartHRTState.HEATING_ON: {SmartHRTState.DETECTING_LAG},
       SmartHRTState.DETECTING_LAG: {SmartHRTState.MONITORING},
       SmartHRTState.MONITORING: {SmartHRTState.RECOVERY},
-      SmartHRTState.RECOVERY: {SmartHRTState.HEATING_PROCESS},
-      SmartHRTState.HEATING_PROCESS: {SmartHRTState.HEATING_ON},
+      SmartHRTState.RECOVERY: {SmartHRTState.HEATING_PROCESSING},
+      SmartHRTState.HEATING_PROCESSING: {SmartHRTState.HEATING_ON},
   }
 
   def transition_to(self, new_state: SmartHRTState) -> bool:

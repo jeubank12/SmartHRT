@@ -195,7 +195,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         return await coord.async_start_heating_cycle()
 
     async def handle_start_recovery(call: ServiceCall) -> dict[str, Any]:
-        """Démarre la relance de chauffage (RECOVERY → HEATING_PROCESS).
+        """Démarre la relance de chauffage (RECOVERY → HEATING_PROCESSING).
 
         ADR-042: Utilise la méthode façade async_manual_start_recovery.
         """
@@ -213,7 +213,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         return await coord.async_manual_start_recovery()
 
     async def handle_end_recovery(call: ServiceCall) -> dict[str, Any]:
-        """Termine la relance de chauffage (HEATING_PROCESS → HEATING_ON).
+        """Termine la relance de chauffage (HEATING_PROCESSING → HEATING_ON).
 
         ADR-042: Utilise la méthode façade async_manual_end_recovery.
         """

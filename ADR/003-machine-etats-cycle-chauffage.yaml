@@ -11,7 +11,7 @@ decision: |
   2. `DETECTING_LAG` : Attente de la baisse effective de température (-0.2°C).
   3. `MONITORING` : Surveillance nocturne (calculs récurrents).
   4. `RECOVERY` : Instant de la relance (calcul RCth).
-  5. `HEATING_PROCESS` : Montée en température (calcul RPth).
+  5. `HEATING_PROCESSING` : Montée en température (calcul RPth).
 
   Cette structure est visible dans la classe `SmartHRTState` et utilisée dans `SmartHRTCoordinator`.
 consequences:

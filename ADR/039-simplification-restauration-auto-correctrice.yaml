@@ -16,14 +16,14 @@ context: |
       recoverycalc = self.data.recoverycalc_hour
       recovery_start_datetime = self.data.recovery_start_hour
 
-      # 1. Si on a dépassé recovery_start_datetime => potentiellement HEATING_PROCESS
+      # 1. Si on a dépassé recovery_start_datetime => potentiellement HEATING_PROCESSING
       if recovery_start_datetime and now >= recovery_start_datetime:
           target_datetime_today = now.replace(hour=target.hour, minute=target.minute, ...)
           if now.date() == recovery_start_datetime.date() and now >= target_datetime_today:
               return SmartHRTState.HEATING_ON
           if now.date() > recovery_start_datetime.date() and current_time >= target:
               return SmartHRTState.HEATING_ON
-          return SmartHRTState.HEATING_PROCESS
+          return SmartHRTState.HEATING_PROCESSING
 
       # 2. Déterminer si on est en période "jour" ou "nuit"
       if target < recoverycalc:
@@ -54,7 +54,7 @@ context: |
 
   HA redémarre à 05:30, `recovery_start_hour` est 05:00, `target_hour` est 06:00.
   L'état persisté est MONITORING (correct au moment de la sauvegarde).
-  La méthode détermine que l'état attendu est HEATING_PROCESS et force une
+  La méthode détermine que l'état attendu est HEATING_PROCESSING et force une
   transition, mais sans les snapshots de `temp_recovery_start` qui auraient
   dû être pris à 05:00.
 
@@ -76,7 +76,7 @@ decision: |
       
       Règles simplifiées :
       1. MONITORING/DETECTING_LAG sont valides la nuit (après recoverycalc, avant target)
-      2. HEATING_PROCESS/RECOVERY sont valides si recovery_start_hour <= now < target
+      2. HEATING_PROCESSING/RECOVERY sont valides si recovery_start_hour <= now < target
       3. HEATING_ON est toujours valide (état par défaut)
       """
       if persisted_state == SmartHRTState.HEATING_ON:
@@ -91,7 +91,7 @@ decision: |
       if persisted_state in (SmartHRTState.MONITORING, SmartHRTState.DETECTING_LAG):
           return is_night
       
-      if persisted_state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS):
+      if persisted_state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESSING):
           if not self.data.recovery_start_hour:
               return False  # Pas de recovery_start_hour = incohérent
           return now >= self.data.recovery_start_hour and current_time < target
@@ -152,7 +152,7 @@ decision: |
           # La surveillance de température reprendra automatiquement
           pass
       
-      elif state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS):
+      elif state in (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESSING):
           # Vérifier si target_hour est dépassée
           target_dt = now.replace(
               hour=self.data.target_hour.hour,

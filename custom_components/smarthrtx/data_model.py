@@ -233,8 +233,8 @@ class SmartHRTData(BaseModel):
 
     @property
     def rp_calc_mode(self) -> bool:
-        """True si en état HEATING_PROCESS (calculs de relance actifs)."""
-        return self.current_state == SmartHRTState.HEATING_PROCESS
+        """True si en état HEATING_PROCESSING (calculs de relance actifs)."""
+        return self.current_state == SmartHRTState.HEATING_PROCESSING
 
     @property
     def temp_lag_detection_active(self) -> bool:

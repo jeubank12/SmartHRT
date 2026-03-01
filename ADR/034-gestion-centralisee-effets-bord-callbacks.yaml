@@ -12,7 +12,7 @@ context: |
   ```python
   def on_recovery_start(self) -> None:
       # Transition d'état
-      self.data.current_state = SmartHRTState.HEATING_PROCESS
+      self.data.current_state = SmartHRTState.HEATING_PROCESSING
       self.data.recovery_calc_mode = False
       self.data.rp_calc_mode = True
       

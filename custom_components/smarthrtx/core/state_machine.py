@@ -31,7 +31,7 @@ class SmartHRTState(StrEnum):
 
     Lifecycle:
     INITIALIZING -> any state (restoration)
-    HEATING_ON -> DETECTING_LAG -> MONITORING -> RECOVERY -> HEATING_PROCESS -> HEATING_ON
+    HEATING_ON -> DETECTING_LAG -> MONITORING -> RECOVERY -> HEATING_PROCESSING -> HEATING_ON
     """
 
     INITIALIZING = "initializing"  # ADR-049: État initial après (re)démarrage
@@ -39,7 +39,7 @@ class SmartHRTState(StrEnum):
     DETECTING_LAG = "detecting_lag"
     MONITORING = "monitoring"
     RECOVERY = "recovery"
-    HEATING_PROCESS = "heating_process"
+    HEATING_PROCESSING = "heating_processing"
 
 
 # State flags: maps state -> (recovery_calc_mode, rp_calc_mode, temp_lag_detection_active)
@@ -49,7 +49,7 @@ STATE_FLAGS: dict[SmartHRTState, tuple[bool, bool, bool]] = {
     SmartHRTState.DETECTING_LAG: (False, False, True),
     SmartHRTState.MONITORING: (True, False, False),
     SmartHRTState.RECOVERY: (False, True, False),
-    SmartHRTState.HEATING_PROCESS: (False, True, False),
+    SmartHRTState.HEATING_PROCESSING: (False, True, False),
 }
 
 # ADR-049: INITIALIZING peut transitionner vers n'importe quel état (restauration)
@@ -59,13 +59,13 @@ VALID_TRANSITIONS: dict[SmartHRTState, set[SmartHRTState]] = {
         SmartHRTState.DETECTING_LAG,
         SmartHRTState.MONITORING,
         SmartHRTState.RECOVERY,
-        SmartHRTState.HEATING_PROCESS,
+        SmartHRTState.HEATING_PROCESSING,
     },
     SmartHRTState.HEATING_ON: {SmartHRTState.DETECTING_LAG},
     SmartHRTState.DETECTING_LAG: {SmartHRTState.MONITORING},
-    SmartHRTState.MONITORING: {SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS},
-    SmartHRTState.RECOVERY: {SmartHRTState.HEATING_PROCESS},
-    SmartHRTState.HEATING_PROCESS: {SmartHRTState.HEATING_ON},
+    SmartHRTState.MONITORING: {SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESSING},
+    SmartHRTState.RECOVERY: {SmartHRTState.HEATING_PROCESSING},
+    SmartHRTState.HEATING_PROCESSING: {SmartHRTState.HEATING_ON},
 }
 
 # ADR-046: Mapping déclaratif transition → actions
@@ -82,7 +82,7 @@ TRANSITION_ACTIONS: dict[tuple[SmartHRTState, SmartHRTState], list[Action]] = {
     (SmartHRTState.INITIALIZING, SmartHRTState.RECOVERY): [
         Action.SCHEDULE_RECOVERY_UPDATE,
     ],
-    (SmartHRTState.INITIALIZING, SmartHRTState.HEATING_PROCESS): [],
+    (SmartHRTState.INITIALIZING, SmartHRTState.HEATING_PROCESSING): [],
     # HEATING_ON → DETECTING_LAG: Démarrage du cycle, pas d'action spécifique
     (SmartHRTState.HEATING_ON, SmartHRTState.DETECTING_LAG): [],
     # DETECTING_LAG → MONITORING: Planifier la mise à jour recovery
@@ -97,12 +97,12 @@ TRANSITION_ACTIONS: dict[tuple[SmartHRTState, SmartHRTState], list[Action]] = {
         Action.CALCULATE_RCTH,
         Action.SAVE_DATA,
     ],
-    # MONITORING → HEATING_PROCESS: Cas où target atteinte sans recovery
-    (SmartHRTState.MONITORING, SmartHRTState.HEATING_PROCESS): [],
-    # RECOVERY → HEATING_PROCESS: Transition naturelle
-    (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESS): [],
-    # HEATING_PROCESS → HEATING_ON: Fin du cycle, calcul RPth
-    (SmartHRTState.HEATING_PROCESS, SmartHRTState.HEATING_ON): [
+    # MONITORING → HEATING_PROCESSING: Cas où target atteinte sans recovery
+    (SmartHRTState.MONITORING, SmartHRTState.HEATING_PROCESSING): [],
+    # RECOVERY → HEATING_PROCESSING: Transition naturelle
+    (SmartHRTState.RECOVERY, SmartHRTState.HEATING_PROCESSING): [],
+    # HEATING_PROCESSING → HEATING_ON: Fin du cycle, calcul RPth
+    (SmartHRTState.HEATING_PROCESSING, SmartHRTState.HEATING_ON): [
         Action.SNAPSHOT_RECOVERY_END,
         Action.CALCULATE_RPTH,
         Action.SAVE_DATA,

@@ -150,7 +150,7 @@ class TestServicesHandlers:
             coord.on_recovery_start()
 
             # Vérifier la transition
-            assert coord.data.current_state == SmartHRTState.HEATING_PROCESS
+            assert coord.data.current_state == SmartHRTState.HEATING_PROCESSING
             assert coord.data.rp_calc_mode is True
 
     @pytest.mark.asyncio
@@ -161,7 +161,7 @@ class TestServicesHandlers:
             mock_dt.now.return_value = mock_now
 
             coord = await create_coordinator(
-                initial_state=SmartHRTState.HEATING_PROCESS,
+                initial_state=SmartHRTState.HEATING_PROCESSING,
                 interior_temp=20.0,
                 exterior_temp=5.0,
                 rp_calc_mode=True,

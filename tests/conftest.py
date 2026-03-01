@@ -196,7 +196,7 @@ def create_coordinator(mock_hass, mock_entry, mock_store):
     # ADR-040: Flags calculés depuis current_state - mapping pour tests legacy
     FLAG_TO_STATE = {
         "recovery_calc_mode": SmartHRTState.MONITORING,
-        "rp_calc_mode": SmartHRTState.HEATING_PROCESS,
+        "rp_calc_mode": SmartHRTState.HEATING_PROCESSING,
         "temp_lag_detection_active": SmartHRTState.DETECTING_LAG,
     }
 

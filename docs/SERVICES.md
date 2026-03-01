@@ -7,7 +7,7 @@ This document describes the available services to control SmartHRTX and their re
 SmartHRTX uses an explicit state machine to model the daily thermal cycle:
 
 ```
-HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESS → HEATING_ON
+HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESSING → HEATING_ON
     ↓            ↓              ↓            ↓             ↓
  (State 1)    (State 2)     (State 3)    (State 4)     (State 5)
 ```
@@ -18,7 +18,7 @@ HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESS →
 - **DETECTING_LAG**: Temperature lag detection after heating stops (-0.2°C)
 - **MONITORING**: Nighttime monitoring, recurring recovery time calculations
 - **RECOVERY**: Recovery start moment (RCth calculation)
-- **HEATING_PROCESS**: Temperature rise phase (RPth calculation)
+- **HEATING_PROCESSING**: Temperature rise phase (RPth calculation)
 
 ## Simplified Services (Recommended)
 
@@ -89,13 +89,13 @@ service: smarthrtx.stop_heating
 
 **Usage**: Starts the heating recovery phase
 
-**Transition**: `MONITORING` → `RECOVERY` → `HEATING_PROCESS`
+**Transition**: `MONITORING` → `RECOVERY` → `HEATING_PROCESSING`
 
 **Description**:
 
 - Calculates RCth (thermal time constant)
 - Enables RPth calculation mode
-- Automatic transition to HEATING_PROCESS
+- Automatic transition to HEATING_PROCESSING
 
 **Parameters**:
 
@@ -105,7 +105,7 @@ service: smarthrtx.stop_heating
 
 ```yaml
 success: true
-state: "heating_process"
+state: "heating_processing"
 time_recovery_start: "2026-02-04T04:30:15+01:00"
 rcth_calculated: 52.3
 message: "Recovery started"
@@ -125,7 +125,7 @@ service: smarthrtx.start_recovery
 
 **Usage**: Ends the recovery phase
 
-**Transition**: `HEATING_PROCESS` → `HEATING_ON`
+**Transition**: `HEATING_PROCESSING` → `HEATING_ON`
 
 **Description**:
 

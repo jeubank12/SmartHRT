@@ -38,11 +38,11 @@ five states form the repeating daily loop.
     │  ~Evening                ~Night              ~Morning  ~Wake-up │
     │     │                      │                    │          │    │
     │     ▼                      ▼                    ▼          ▼    │
-    │  HEATING_ON ──► DETECTING_LAG ──► MONITORING ──► RECOVERY ──► HEATING_PROCESS ──┐
+    │  HEATING_ON ──► DETECTING_LAG ──► MONITORING ──► RECOVERY ──► HEATING_PROCESSING ──┐
     │     ▲                                │                               │           │
     │     └───────────────────────────────────────────────────────────────┘           │
     │                                      │ (already at target temp)                 │
-    │                                      └──────────────────► HEATING_PROCESS ──────┘
+    │                                      └──────────────────► HEATING_PROCESSING ──────┘
     └─────────────────────────────────────────────────────────────────┘
 
 INITIALIZING ──► any state  (on every HA restart, restores persisted state)
@@ -66,9 +66,9 @@ this morning recovery.
 | **INITIALIZING**    | Every HA (re)start                                             | Restores persisted state; schedules any needed timers          | Any state (restore) |
 | **HEATING_ON**      | Daily idle — after the morning cycle completes                 | SmartHRTX is passive; normal automations control the heater   | DETECTING_LAG       |
 | **DETECTING_LAG**   | `stop_heating` service called (evening heater shuts off)       | Watches for a 0.2°C indoor drop to confirm cooling has begun; records the lag timestamp | MONITORING |
-| **MONITORING**      | Cooling confirmed (lag detected)                               | Calculates when heating must restart; sets a wake-up timer     | RECOVERY (or HEATING_PROCESS if already at target) |
-| **RECOVERY**        | Timer fires at the calculated restart time (morning)           | Heating turns on; measures actual warm-up rate to calibrate RPth | HEATING_PROCESS  |
-| **HEATING_PROCESS** | Target wake-up hour reached                                    | Snapshots final temperature; updates RPth with exponential relaxation; saves coefficients; resets to idle | HEATING_ON |
+| **MONITORING**      | Cooling confirmed (lag detected)                               | Calculates when heating must restart; sets a wake-up timer     | RECOVERY (or HEATING_PROCESSING if already at target) |
+| **RECOVERY**        | Timer fires at the calculated restart time (morning)           | Heating turns on; measures actual warm-up rate to calibrate RPth | HEATING_PROCESSING  |
+| **HEATING_PROCESSING** | Target wake-up hour reached                                    | Snapshots final temperature; updates RPth with exponential relaxation; saves coefficients; resets to idle | HEATING_ON |
 
 ### A Concrete Day in the Life
 
@@ -86,9 +86,9 @@ this morning recovery.
        Heating turns on.
 
 06:00  Target wake-up hour reached.
-       state: RECOVERY → HEATING_PROCESS
+       state: RECOVERY → HEATING_PROCESSING
        RPth updated from measured warm-up rate.
-       Data saved.  state: HEATING_PROCESS → HEATING_ON
+       Data saved.  state: HEATING_PROCESSING → HEATING_ON
 ```
 
 ## Thermal Model
