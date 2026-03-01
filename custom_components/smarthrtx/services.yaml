@@ -1,19 +1,15 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# SERVICES SIMPLIFIÉS (RECOMMANDÉS)
-# ═══════════════════════════════════════════════════════════════════════════
-
 start_heating_cycle:
-  name: Démarrer Cycle Chauffage
+  name: Start Heating Cycle
   description: >
-    Démarre un nouveau cycle de chauffage journalier. 
-    Place la machine à états en mode HEATING_ON (chauffage actif).
-    Utilisez ce service pour forcer le début d'un nouveau cycle.
+    Starts a new daily heating cycle.
+    Places the state machine in HEATING_ON mode (active heating).
+    Use this service to force the start of a new cycle.
   fields:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
-        spécifiez l'entry_id pour cibler une instance spécifique.
+        The SmartHRTX instance ID (multi-instance). If you have multiple instances,
+        specify the entry_id to target a specific instance.
       required: false
       advanced: true
       example: "abc123def456"
@@ -21,17 +17,17 @@ start_heating_cycle:
         text:
 
 stop_heating:
-  name: Arrêter Chauffage
+  name: Stop Heating
   description: >
-    Arrête le chauffage et démarre la phase de surveillance nocturne.
-    Active la détection du lag de température puis lance les calculs de relance.
+    Stops heating and starts the nightly monitoring phase.
+    Activates temperature lag detection then starts recovery calculations.
     Transitions: HEATING_ON → DETECTING_LAG → MONITORING.
   fields:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
-        spécifiez l'entry_id pour cibler une instance spécifique.
+        The SmartHRTX instance ID (multi-instance). If you have multiple instances,
+        specify the entry_id to target a specific instance.
       required: false
       advanced: true
       example: "abc123def456"
@@ -39,17 +35,17 @@ stop_heating:
         text:
 
 start_recovery:
-  name: Démarrer Relance
+  name: Start Recovery
   description: >
-    Démarre la phase de relance du chauffage pour atteindre la température cible 
-    à l'heure de réveil. Calcule automatiquement RCth et active le calcul de RPth.
+    Starts the heating recovery phase to reach the target temperature
+    at wake-up time. Automatically calculates RCth and activates RPth calculation.
     Transitions: MONITORING → RECOVERY → HEATING_PROCESS.
   fields:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
-        spécifiez l'entry_id pour cibler une instance spécifique.
+        The SmartHRTX instance ID (multi-instance). If you have multiple instances,
+        specify the entry_id to target a specific instance.
       required: false
       advanced: true
       example: "abc123def456"
@@ -57,17 +53,17 @@ start_recovery:
         text:
 
 end_recovery:
-  name: Terminer Relance
+  name: End Recovery
   description: >
-    Termine la phase de relance (consigne atteinte ou heure cible atteinte).
-    Calcule RPth et retourne en mode chauffage normal.
+    Ends the recovery phase (target reached or target time reached).
+    Calculates RPth and returns to normal heating mode.
     Transition: HEATING_PROCESS → HEATING_ON.
   fields:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
-        spécifiez l'entry_id pour cibler une instance spécifique.
+        The SmartHRTX instance ID (multi-instance). If you have multiple instances,
+        specify the entry_id to target a specific instance.
       required: false
       advanced: true
       example: "abc123def456"
@@ -75,40 +71,36 @@ end_recovery:
         text:
 
 get_state:
-  name: Obtenir État
+  name: Get State
   description: >
-    Retourne l'état actuel de la machine à états avec tous les détails 
-    (températures, heures, coefficients thermiques, modes actifs).
-    Utile pour le debug et la supervision.
+    Returns the current state machine state with all details
+    (temperatures, times, thermal coefficients, active modes).
+    Useful for debugging and monitoring.
   fields:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
-        spécifiez l'entry_id pour cibler une instance spécifique.
+        The SmartHRTX instance ID (multi-instance). If you have multiple instances,
+        specify the entry_id to target a specific instance.
       required: false
       advanced: true
       example: "abc123def456"
       selector:
         text:
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SERVICES UTILITAIRES
-# ═══════════════════════════════════════════════════════════════════════════
-
 reset_learning:
-  name: Réinitialiser Apprentissage
+  name: Reset Learning
   description: >
-    Réinitialise tous les coefficients thermiques appris (RCth, RPth et leurs 
-    variantes vent) aux valeurs par défaut (50). Utilisez ce service si les 
-    valeurs apprises sont devenues inexactes, par exemple après des modifications 
-    de l'habitation ou de l'isolation.
+    Resets all learned thermal coefficients (RCth, RPth and their
+    wind variants) to default values (50). Use this service if learned
+    values have become inaccurate, for example after modifications to
+    the home or insulation.
   fields:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
-        spécifiez l'entry_id pour cibler une instance spécifique.
+        The SmartHRTX instance ID (multi-instance). If you have multiple instances,
+        specify the entry_id to target a specific instance.
       required: false
       advanced: true
       example: "abc123def456"
@@ -116,17 +108,17 @@ reset_learning:
         text:
 
 trigger_calculation:
-  name: Déclencher Calcul
+  name: Trigger Calculation
   description: >
-    Déclenche immédiatement un nouveau calcul de l'heure de relance.
-    Utile après avoir modifié des paramètres pour voir l'effet immédiatement 
-    sans attendre le prochain calcul automatique.
+    Immediately triggers a new recovery time calculation.
+    Useful after modifying parameters to see the effect immediately
+    without waiting for the next automatic calculation.
   fields:
     entry_id:
       name: Entry ID
       description: >
-        L'ID de l'instance SmartHRTX (multi-instance). Si vous avez plusieurs instances, 
-        spécifiez l'entry_id pour cibler une instance spécifique.
+        The SmartHRTX instance ID (multi-instance). If you have multiple instances,
+        specify the entry_id to target a specific instance.
       required: false
       advanced: true
       example: "abc123def456"

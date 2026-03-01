@@ -55,9 +55,9 @@
     }
   },
   "services": {
-    "calculate_recovery_time": {
-      "name": "Aufheizzeit berechnen",
-      "description": "Berechnet die Startzeit der Heizung basierend auf thermischen Parametern.",
+    "start_heating_cycle": {
+      "name": "Heizzyklus starten",
+      "description": "Startet einen neuen täglichen Heizzyklus und versetzt die Zustandsmaschine in den HEATING_ON-Modus.",
       "fields": {
         "entry_id": {
           "name": "Konfigurations-ID",
@@ -65,9 +65,9 @@
         }
       }
     },
-    "calculate_recovery_update_time": {
-      "name": "Aktualisierungszeit berechnen",
-      "description": "Berechnet, wann die nächste Aktualisierung der Aufheizberechnung erfolgen soll.",
+    "stop_heating": {
+      "name": "Heizung stoppen",
+      "description": "Stoppt die Heizung und startet die nächtliche Überwachungsphase (HEATING_ON → DETECTING_LAG → MONITORING).",
       "fields": {
         "entry_id": {
           "name": "Konfigurations-ID",
@@ -75,9 +75,9 @@
         }
       }
     },
-    "calculate_rcth_fast": {
-      "name": "Dynamisches RCth berechnen",
-      "description": "Berechnet die dynamische Entwicklung von RCth vor dem Start der Aufheizung.",
+    "start_recovery": {
+      "name": "Aufheizung starten",
+      "description": "Startet die Aufheizphase, um die Zieltemperatur zur Aufwachzeit zu erreichen (MONITORING → RECOVERY).",
       "fields": {
         "entry_id": {
           "name": "Konfigurations-ID",
@@ -85,9 +85,9 @@
         }
       }
     },
-    "on_heating_stop": {
-      "name": "Heizungsstopp",
-      "description": "Löst Aktionen aus, wenn die Heizung stoppt (zeichnet Temperaturen und Zeitstempel für Berechnungen auf).",
+    "end_recovery": {
+      "name": "Aufheizung beenden",
+      "description": "Beendet die Aufheizphase, berechnet RPth und kehrt zum normalen Heizbetrieb zurück (HEATING_PROCESS → HEATING_ON).",
       "fields": {
         "entry_id": {
           "name": "Konfigurations-ID",
@@ -95,9 +95,9 @@
         }
       }
     },
-    "on_recovery_start": {
-      "name": "Aufheizstart",
-      "description": "Löst Aktionen zu Beginn der Aufheizung aus (zeichnet Temperaturen auf und berechnet RCth).",
+    "get_state": {
+      "name": "Zustand abrufen",
+      "description": "Gibt den aktuellen Zustand der Zustandsmaschine mit allen Details zurück (Temperaturen, Zeiten, thermische Koeffizienten, aktive Modi).",
       "fields": {
         "entry_id": {
           "name": "Konfigurations-ID",
@@ -105,9 +105,19 @@
         }
       }
     },
-    "on_recovery_end": {
-      "name": "Aufheizende",
-      "description": "Löst Aktionen am Ende der Aufheizung aus (zeichnet Temperaturen auf und berechnet RPth).",
+    "reset_learning": {
+      "name": "Lernwerte zurücksetzen",
+      "description": "Setzt alle gelernten thermischen Koeffizienten (RCth, RPth) auf ihre Standardwerte zurück.",
+      "fields": {
+        "entry_id": {
+          "name": "Konfigurations-ID",
+          "description": "Die Konfigurations-ID (optional, verwendet die erste verfügbare wenn nicht angegeben)."
+        }
+      }
+    },
+    "trigger_calculation": {
+      "name": "Berechnung auslösen",
+      "description": "Löst sofort eine neue Berechnung der Aufheizzeit aus.",
       "fields": {
         "entry_id": {
           "name": "Konfigurations-ID",

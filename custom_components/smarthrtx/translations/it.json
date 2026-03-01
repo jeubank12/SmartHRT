@@ -55,9 +55,9 @@
     }
   },
   "services": {
-    "calculate_recovery_time": {
-      "name": "Calcola ora di riavvio",
-      "description": "Calcola l'ora di avvio del riscaldamento in base ai parametri termici.",
+    "start_heating_cycle": {
+      "name": "Avvia ciclo di riscaldamento",
+      "description": "Avvia un nuovo ciclo di riscaldamento giornaliero, portando la macchina a stati in modalità HEATING_ON.",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -65,9 +65,9 @@
         }
       }
     },
-    "calculate_recovery_update_time": {
-      "name": "Calcola ora aggiornamento",
-      "description": "Calcola quando deve avvenire il prossimo aggiornamento del calcolo di riavvio.",
+    "stop_heating": {
+      "name": "Ferma riscaldamento",
+      "description": "Ferma il riscaldamento e avvia la fase di monitoraggio notturno (HEATING_ON → DETECTING_LAG → MONITORING).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -75,9 +75,9 @@
         }
       }
     },
-    "calculate_rcth_fast": {
-      "name": "Calcola RCth dinamico",
-      "description": "Calcola l'evoluzione dinamica di RCth prima dell'avvio del riscaldamento.",
+    "start_recovery": {
+      "name": "Avvia recupero",
+      "description": "Avvia la fase di recupero del riscaldamento per raggiungere la temperatura target all'ora di sveglia (MONITORING → RECOVERY).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -85,9 +85,9 @@
         }
       }
     },
-    "on_heating_stop": {
-      "name": "Arresto riscaldamento",
-      "description": "Attiva le azioni quando il riscaldamento si spegne (registra temperature e orari per i calcoli).",
+    "end_recovery": {
+      "name": "Termina recupero",
+      "description": "Termina la fase di recupero, calcola RPth e ritorna alla modalità di riscaldamento normale (HEATING_PROCESS → HEATING_ON).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -95,9 +95,9 @@
         }
       }
     },
-    "on_recovery_start": {
-      "name": "Inizio riavvio",
-      "description": "Attiva le azioni all'inizio del riavvio del riscaldamento (registra temperature e calcola RCth).",
+    "get_state": {
+      "name": "Ottieni stato",
+      "description": "Restituisce lo stato attuale della macchina a stati con tutti i dettagli (temperature, orari, coefficienti termici, modalità attive).",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",
@@ -105,9 +105,19 @@
         }
       }
     },
-    "on_recovery_end": {
-      "name": "Fine riavvio",
-      "description": "Attiva le azioni alla fine del riavvio del riscaldamento (registra temperature e calcola RPth).",
+    "reset_learning": {
+      "name": "Reimposta apprendimento",
+      "description": "Reimposta tutti i coefficienti termici appresi (RCth, RPth) ai loro valori predefiniti.",
+      "fields": {
+        "entry_id": {
+          "name": "ID configurazione",
+          "description": "L'ID della configurazione (opzionale, usa il primo disponibile se non specificato)."
+        }
+      }
+    },
+    "trigger_calculation": {
+      "name": "Attiva calcolo",
+      "description": "Attiva immediatamente un nuovo calcolo dell'ora di recupero.",
       "fields": {
         "entry_id": {
           "name": "ID configurazione",

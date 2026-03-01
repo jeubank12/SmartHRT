@@ -59,83 +59,73 @@
     }
   },
   "services": {
-    "calculate_recovery_time": {
-      "name": "Calculer l'heure de relance",
-      "description": "Calcule l'heure de démarrage de la relance du chauffage en fonction des paramètres thermiques.",
+    "start_heating_cycle": {
+      "name": "Démarrer Cycle Chauffage",
+      "description": "Démarre un nouveau cycle de chauffage journalier. Place la machine à états en mode HEATING_ON (chauffage actif).",
       "fields": {
         "entry_id": {
           "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
+          "description": "L'ID de l'instance SmartHRTX (optionnel, utilise la première disponible si non spécifié)."
         }
       }
     },
-    "calculate_recovery_update_time": {
-      "name": "Calculer l'heure de mise à jour",
-      "description": "Calcule quand la prochaine mise à jour du calcul de relance doit avoir lieu.",
+    "stop_heating": {
+      "name": "Arrêter Chauffage",
+      "description": "Arrête le chauffage et démarre la phase de surveillance nocturne (HEATING_ON → DETECTING_LAG → MONITORING).",
       "fields": {
         "entry_id": {
           "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
+          "description": "L'ID de l'instance SmartHRTX (optionnel, utilise la première disponible si non spécifié)."
         }
       }
     },
-    "calculate_rcth_fast": {
-      "name": "Calculer RCth dynamique",
-      "description": "Calcule l'évolution dynamique de RCth avant le démarrage de la relance.",
+    "start_recovery": {
+      "name": "Démarrer Relance",
+      "description": "Démarre la phase de relance du chauffage pour atteindre la température cible à l'heure de réveil (MONITORING → RECOVERY).",
       "fields": {
         "entry_id": {
           "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
+          "description": "L'ID de l'instance SmartHRTX (optionnel, utilise la première disponible si non spécifié)."
         }
       }
     },
-    "on_heating_stop": {
-      "name": "Arrêt du chauffage",
-      "description": "Déclenche les actions lors de l'arrêt du chauffage (enregistre les températures et horodatages pour les calculs).",
+    "end_recovery": {
+      "name": "Terminer Relance",
+      "description": "Termine la phase de relance, calcule RPth et retourne en mode chauffage normal (HEATING_PROCESS → HEATING_ON).",
       "fields": {
         "entry_id": {
           "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
+          "description": "L'ID de l'instance SmartHRTX (optionnel, utilise la première disponible si non spécifié)."
         }
       }
     },
-    "on_recovery_start": {
-      "name": "Début de la relance",
-      "description": "Déclenche les actions au début de la relance du chauffage (enregistre les températures et calcule RCth).",
+    "get_state": {
+      "name": "Obtenir État",
+      "description": "Retourne l'état actuel de la machine à états avec tous les détails (températures, heures, coefficients thermiques, modes actifs).",
       "fields": {
         "entry_id": {
           "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
-        }
-      }
-    },
-    "on_recovery_end": {
-      "name": "Fin de la relance",
-      "description": "Déclenche les actions à la fin de la relance du chauffage (enregistre les températures et calcule RPth).",
-      "fields": {
-        "entry_id": {
-          "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
+          "description": "L'ID de l'instance SmartHRTX (optionnel, utilise la première disponible si non spécifié)."
         }
       }
     },
     "reset_learning": {
-      "name": "Réinitialiser l'apprentissage",
+      "name": "Réinitialiser Apprentissage",
       "description": "Réinitialise tous les coefficients thermiques appris (RCth, RPth) à leurs valeurs par défaut.",
       "fields": {
         "entry_id": {
           "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
+          "description": "L'ID de l'instance SmartHRTX (optionnel, utilise la première disponible si non spécifié)."
         }
       }
     },
     "trigger_calculation": {
-      "name": "Déclencher le calcul",
+      "name": "Déclencher Calcul",
       "description": "Déclenche manuellement un recalcul immédiat de l'heure de relance.",
       "fields": {
         "entry_id": {
           "name": "ID de l'entrée",
-          "description": "L'ID de l'entrée de configuration (optionnel, utilise la première disponible si non spécifié)."
+          "description": "L'ID de l'instance SmartHRTX (optionnel, utilise la première disponible si non spécifié)."
         }
       }
     }
