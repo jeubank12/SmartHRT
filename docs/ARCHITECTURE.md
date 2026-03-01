@@ -27,27 +27,69 @@ SmartHRTX is a Home Assistant custom integration built on the **DataUpdateCoordi
 
 ## State Machine
 
-SmartHRTX uses a **5-state finite state machine** for the daily heating cycle:
+SmartHRTX uses a **6-state finite state machine** to manage the daily heating cycle. The system
+starts in `INITIALIZING` on every boot and restores the previously persisted state; the remaining
+five states form the repeating daily loop.
 
 ```
-Evening (23:00)          Night              Morning           Wake-up (06:00)
-      │                   │                    │                    │
-      ▼                   ▼                    ▼                    ▼
-   HEATING_ON ────► DETECTING_LAG ────► MONITORING ────► RECOVERY ────► RECOVERY_END
-      │                   │                    │                │
-   Stop heating      Temp drops            Calculate      Start heating    Target reached
-   Record baseline   Detect pattern        recovery time   Update learning
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                       Repeating daily loop                      │
+    │                                                                 │
+    │  ~Evening                ~Night              ~Morning  ~Wake-up │
+    │     │                      │                    │          │    │
+    │     ▼                      ▼                    ▼          ▼    │
+    │  HEATING_ON ──► DETECTING_LAG ──► MONITORING ──► RECOVERY ──► HEATING_PROCESS ──┐
+    │     ▲                                │                               │           │
+    │     └───────────────────────────────────────────────────────────────┘           │
+    │                                      │ (already at target temp)                 │
+    │                                      └──────────────────► HEATING_PROCESS ──────┘
+    └─────────────────────────────────────────────────────────────────┘
+
+INITIALIZING ──► any state  (on every HA restart, restores persisted state)
 ```
+
+### Understanding the Naming
+
+The state names can be confusing at first because **"HEATING_ON" does not mean the physical
+heater is running right now**. Think of it as "in the normal daily operating mode." The heater
+runs or stops under your normal Home Assistant automations — SmartHRTX only kicks in at specific
+transition points to observe temperatures and learn.
+
+The word **"Recovery"** refers to the morning re-heat: after overnight cooling, the room needs to
+"recover" its heat before wake-up. The lag-detection phase happens in the *evening*, not during
+this morning recovery.
 
 ### State Descriptions
 
-| State             | Triggered By                         | Action                         | Transitions To |
-| ----------------- | ------------------------------------ | ------------------------------ | -------------- |
-| **HEATING_ON**    | Heating active                       | Monitor heating effect         | DETECTING_LAG  |
-| **DETECTING_LAG** | Temp drops 0.2°C+                    | Detect thermal response delay  | MONITORING     |
-| **MONITORING**    | Recovery time calculated             | Wait for calculated start time | RECOVERY       |
-| **RECOVERY**      | Heating starts at calculated time    | Measure heating rate (RPth)    | RECOVERY_END   |
-| **RECOVERY_END**  | Target hour reached or temp achieved | Finalize learning, reset       | HEATING_ON     |
+| State               | When you enter it                                              | What happens inside                                            | Exits to            |
+| ------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- | ------------------- |
+| **INITIALIZING**    | Every HA (re)start                                             | Restores persisted state; schedules any needed timers          | Any state (restore) |
+| **HEATING_ON**      | Daily idle — after the morning cycle completes                 | SmartHRTX is passive; normal automations control the heater   | DETECTING_LAG       |
+| **DETECTING_LAG**   | `stop_heating` service called (evening heater shuts off)       | Watches for a 0.2°C indoor drop to confirm cooling has begun; records the lag timestamp | MONITORING |
+| **MONITORING**      | Cooling confirmed (lag detected)                               | Calculates when heating must restart; sets a wake-up timer     | RECOVERY (or HEATING_PROCESS if already at target) |
+| **RECOVERY**        | Timer fires at the calculated restart time (morning)           | Heating turns on; measures actual warm-up rate to calibrate RPth | HEATING_PROCESS  |
+| **HEATING_PROCESS** | Target wake-up hour reached                                    | Snapshots final temperature; updates RPth with exponential relaxation; saves coefficients; resets to idle | HEATING_ON |
+
+### A Concrete Day in the Life
+
+```
+18:00  Your evening automation turns the heater off.
+       You call smarthrtx.stop_heating → state: HEATING_ON → DETECTING_LAG
+
+18:07  Indoor temp has dropped 0.2°C since the heater stopped.
+       Lag confirmed → state: DETECTING_LAG → MONITORING
+       Recovery start time calculated and timer scheduled.
+
+02:30  Calculated restart time fires.
+       state: MONITORING → RECOVERY
+       RCth updated from overnight cooling curve.
+       Heating turns on.
+
+06:00  Target wake-up hour reached.
+       state: RECOVERY → HEATING_PROCESS
+       RPth updated from measured warm-up rate.
+       Data saved.  state: HEATING_PROCESS → HEATING_ON
+```
 
 ## Thermal Model
 
