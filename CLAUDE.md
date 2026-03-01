@@ -62,17 +62,23 @@ black .
 
 Dev container is configured in `.devcontainer/` — preferred for VS Code.
 
-## State Machine (5 states)
+## State Machine (6 states)
 
 ```
-HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → RECOVERY_END → HEATING_ON
+INITIALIZING → (restored state)   ← every HA restart lands here first
+
+HEATING_ON → DETECTING_LAG → MONITORING → RECOVERY → HEATING_PROCESS → HEATING_ON
 ```
 
-- **HEATING_ON**: Normal daytime
-- **DETECTING_LAG**: Waits for 0.2°C drop after heating stops
-- **MONITORING**: Nightly, recalculates recovery start time
-- **RECOVERY**: Heating starts, measures RPth
-- **RECOVERY_END**: Target hour reached, finalises learning
+- **INITIALIZING**: Transient boot state; restores persisted state and exits immediately
+- **HEATING_ON**: Daily idle — SmartHRTX is passive; normal automations control the heater
+- **DETECTING_LAG**: Evening, heater just stopped; waits for 0.2°C drop to confirm cooling and record lag
+- **MONITORING**: Cooling confirmed; waits for calculated morning restart time
+- **RECOVERY**: Morning re-heat underway; measures actual warm-up rate (RPth calibration)
+- **HEATING_PROCESS**: Wake-up hour reached; finalises RPth, saves coefficients, resets to idle
+
+> **Naming note:** `HEATING_ON` does **not** mean the physical heater is running — it is the
+> resting/idle state between cycles. "Recovery" means recovering room heat lost overnight.
 
 ## Thermal Constants
 
