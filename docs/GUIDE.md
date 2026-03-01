@@ -55,6 +55,133 @@ SmartHRTX automatically calculates the optimal time to start your heating in the
 
 > **Tip:** Find sensor names in **Developer Tools** → **States**
 
+## Connecting Your Thermostat
+
+SmartHRTX **never controls your thermostat directly**. It calculates *when* to start heating
+and exposes that time as a sensor. Your Home Assistant automations read that sensor and issue
+the actual `climate.turn_on` / `climate.turn_off` commands.
+
+### Division of Responsibility
+
+| Who does it | What |
+|---|---|
+| **SmartHRTX** (automatic) | Calculates recovery start time; manages its own state machine; learns RCth/RPth |
+| **Your automation** | Turns the thermostat ON/OFF based on SmartHRTX sensor values |
+
+> You do **not** need to call any `smarthrtx.*` service in a normal daily cycle. All state
+> transitions (`stop_heating`, `start_recovery`, `end_recovery`) fire automatically from
+> internal timers at `recoverycalc_hour`, `recovery_start_hour`, and `target_hour`.
+
+### The Two Automations You Need
+
+#### 1 — Turn heating ON in the morning
+
+Trigger on the **`heure_de_relance`** timestamp sensor. SmartHRTX updates this each night
+after it measures overnight cooling.
+
+```yaml
+alias: "SmartHRTX – Start morning heating"
+trigger:
+  - platform: time
+    at: sensor.smarthrtx_heure_de_relance
+action:
+  - action: climate.set_temperature
+    target:
+      entity_id: climate.YOUR_THERMOSTAT
+    data:
+      temperature: 20   # match your SmartHRTX target temperature
+```
+
+#### 2 — Turn heating OFF in the evening
+
+Trigger on the **`heure_coupure_timestamp`** sensor (your configured stop hour). This is also
+when SmartHRTX internally starts its learning cycle for the night — the two happen in parallel.
+
+```yaml
+alias: "SmartHRTX – Stop evening heating"
+trigger:
+  - platform: time
+    at: sensor.smarthrtx_heure_coupure_timestamp
+action:
+  - action: climate.turn_off
+    target:
+      entity_id: climate.YOUR_THERMOSTAT
+```
+
+> **Do I also need to call `smarthrtx.stop_heating`?** No. SmartHRTX fires that transition
+> internally at `recoverycalc_hour`. Only call it manually if you turn off the heater at a
+> *different* time than the configured stop hour (e.g. you leave early or override via the app).
+
+### What Happens Each Day (No Action Required From You)
+
+```
+recoverycalc_hour (e.g. 23:00)
+  SmartHRTX: HEATING_ON → DETECTING_LAG
+  Your automation: climate.turn_off fires
+
+~23:07  Indoor temp drops 0.2 °C
+  SmartHRTX: DETECTING_LAG → MONITORING
+  Recovery start time calculated; internal timer scheduled
+
+~02:30  Calculated recovery_start_hour fires
+  SmartHRTX: MONITORING → RECOVERY  (internal only)
+  Your automation: climate.set_temperature fires (from sensor trigger)
+
+target_hour (e.g. 06:00)
+  SmartHRTX: RECOVERY → HEATING_PROCESS → HEATING_ON
+  RPth updated and saved. Cycle complete.
+```
+
+### When to Call Services Manually
+
+The `smarthrtx.*` services are for **exceptional situations**, not daily operation:
+
+| Situation | Service to call |
+|---|---|
+| You turned the heater off early (not at the configured stop hour) | `smarthrtx.stop_heating` — tells SmartHRTX to begin its observation cycle now |
+| You came home from a multi-day absence | `smarthrtx.start_heating_cycle` — resets the state machine to idle |
+| Coefficients seem badly wrong after renovation | `smarthrtx.reset_learning` — wipes learned values back to defaults |
+| You changed a parameter and want to see the new start time immediately | `smarthrtx.trigger_calculation` |
+
+### Common Climate Entity Patterns
+
+**`climate.*` (e.g. Nest, Tado, generic thermostat)**
+
+```yaml
+# Turn on: set target temperature
+action: climate.set_temperature
+data:
+  temperature: 20
+  hvac_mode: heat
+
+# Turn off
+action: climate.turn_off
+```
+
+**`switch.*` (relay-based heater)**
+
+```yaml
+# Turn on
+action: switch.turn_on
+target:
+  entity_id: switch.YOUR_HEATER_RELAY
+
+# Turn off
+action: switch.turn_off
+target:
+  entity_id: switch.YOUR_HEATER_RELAY
+```
+
+**`script.*` (existing heating script)**
+
+```yaml
+action: script.turn_on
+target:
+  entity_id: script.YOUR_HEATING_SCRIPT
+```
+
+---
+
 ## How It Works
 
 ### Daily Cycle
