@@ -20,15 +20,31 @@
           "target_hour": "Hora objetivo",
           "recoverycalc_hour": "Hora de apagado de calefacción",
           "sensor_interior_temperature": "Sensor de temperatura interior",
+          "weather_entity": "Fuente meteorológica (previsiones + condiciones de respaldo)",
+          "sensor_outdoor_temperature": "Sensor de temperatura exterior (sustitución opcional)",
+          "sensor_wind_speed": "Sensor de velocidad del viento (sustitución opcional)",
           "tsp": "Temperatura deseada (Set Point)"
         },
         "data_description": {
           "target_hour": "Hora de despertar deseada (ej: 6:00)",
           "recoverycalc_hour": "Hora de apagado de la calefacción por la noche (ej: 23:00)",
           "sensor_interior_temperature": "Sensor de temperatura de la habitación (ej: sensor.room_temperature)",
-          "tsp": "Temperatura deseada (13-26°C)"
+          "weather_entity": "Integración meteorológica usada para previsiones horarias y como respaldo para condiciones actuales (ej: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Si se configura, este sensor reemplaza la temperatura actual de la entidad meteorológica (ej: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Si se configura, este sensor reemplaza la velocidad del viento actual de la entidad meteorológica (ej: sensor.ambient_wind_speed).",
+          "tsp": "Temperatura deseada ({tsp_range})"
         }
       }
+    },
+    "error": {
+      "weather_not_found": "Entidad meteorológica no encontrada",
+      "weather_incompatible": "La entidad meteorológica no admite previsiones",
+      "sensor_not_found": "Sensor de temperatura no encontrado",
+      "tsp_out_of_range": "Temperatura fuera de rango (13–26 °C)",
+      "tsp_out_of_range_f": "Temperatura fuera de rango (55–79 °F)",
+      "invalid_time_sequence": "La hora de apagado debe preceder a la hora objetivo",
+      "invalid_name": "Nombre no válido",
+      "unknown_error": "Error de configuración"
     }
   },
   "options": {
@@ -42,6 +58,9 @@
           "target_hour": "Hora objetivo",
           "recoverycalc_hour": "Hora de apagado de calefacción",
           "sensor_interior_temperature": "Sensor de temperatura interior",
+          "weather_entity": "Fuente meteorológica (previsiones + condiciones de respaldo)",
+          "sensor_outdoor_temperature": "Sensor de temperatura exterior (sustitución opcional)",
+          "sensor_wind_speed": "Sensor de velocidad del viento (sustitución opcional)",
           "tsp": "Temperatura deseada (Set Point)"
         },
         "data_description": {
@@ -49,7 +68,10 @@
           "target_hour": "Hora de despertar deseada (ej: 6:00)",
           "recoverycalc_hour": "Hora de apagado de la calefacción por la noche (ej: 23:00)",
           "sensor_interior_temperature": "Sensor de temperatura de la habitación (ej: sensor.room_temperature)",
-          "tsp": "Temperatura deseada (13-26°C)"
+          "weather_entity": "Integración meteorológica usada para previsiones horarias y como respaldo para condiciones actuales (ej: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Si se configura, este sensor reemplaza la temperatura actual de la entidad meteorológica (ej: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Si se configura, este sensor reemplaza la velocidad del viento actual de la entidad meteorológica (ej: sensor.ambient_wind_speed).",
+          "tsp": "Temperatura deseada ({tsp_range})"
         }
       }
     }

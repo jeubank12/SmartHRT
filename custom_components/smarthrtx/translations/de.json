@@ -20,15 +20,31 @@
           "target_hour": "Zielzeit",
           "recoverycalc_hour": "Heizung Abschaltzeit",
           "sensor_interior_temperature": "Innentemperatursensor",
+          "weather_entity": "Wetterquelle (Prognosen + Fallback-Bedingungen)",
+          "sensor_outdoor_temperature": "Außentemperatursensor (optionale Überschreibung)",
+          "sensor_wind_speed": "Windgeschwindigkeitssensor (optionale Überschreibung)",
           "tsp": "Solltemperatur (Set Point)"
         },
         "data_description": {
           "target_hour": "Gewünschte Aufwachzeit (z.B.: 6:00)",
           "recoverycalc_hour": "Abschaltzeit der Heizung am Abend (z.B.: 23:00)",
           "sensor_interior_temperature": "Raumtemperatursensor (z.B.: sensor.room_temperature)",
-          "tsp": "Gewünschte Temperatur (13-26°C)"
+          "weather_entity": "Wetterintegration für stündliche Prognosen und als Fallback für aktuelle Bedingungen (z.B.: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Falls gesetzt, ersetzt dieser Sensor die aktuelle Temperatur der Wetterentität (z.B.: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Falls gesetzt, ersetzt dieser Sensor die aktuelle Windgeschwindigkeit der Wetterentität (z.B.: sensor.ambient_wind_speed).",
+          "tsp": "Gewünschte Temperatur ({tsp_range})"
         }
       }
+    },
+    "error": {
+      "weather_not_found": "Wetterentität nicht gefunden",
+      "weather_incompatible": "Wetterentität unterstützt keine Prognosen",
+      "sensor_not_found": "Temperatursensor nicht gefunden",
+      "tsp_out_of_range": "Solltemperatur außerhalb des Bereichs (13–26 °C)",
+      "tsp_out_of_range_f": "Solltemperatur außerhalb des Bereichs (55–79 °F)",
+      "invalid_time_sequence": "Abschaltzeit muss vor der Zielzeit liegen",
+      "invalid_name": "Ungültiger Name",
+      "unknown_error": "Konfigurationsfehler"
     }
   },
   "options": {
@@ -42,6 +58,9 @@
           "target_hour": "Zielzeit",
           "recoverycalc_hour": "Heizung Abschaltzeit",
           "sensor_interior_temperature": "Innentemperatursensor",
+          "weather_entity": "Wetterquelle (Prognosen + Fallback-Bedingungen)",
+          "sensor_outdoor_temperature": "Außentemperatursensor (optionale Überschreibung)",
+          "sensor_wind_speed": "Windgeschwindigkeitssensor (optionale Überschreibung)",
           "tsp": "Solltemperatur (Set Point)"
         },
         "data_description": {
@@ -49,7 +68,10 @@
           "target_hour": "Gewünschte Aufwachzeit (z.B.: 6:00)",
           "recoverycalc_hour": "Abschaltzeit der Heizung am Abend (z.B.: 23:00)",
           "sensor_interior_temperature": "Raumtemperatursensor (z.B.: sensor.room_temperature)",
-          "tsp": "Gewünschte Temperatur (13-26°C)"
+          "weather_entity": "Wetterintegration für stündliche Prognosen und als Fallback für aktuelle Bedingungen (z.B.: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Falls gesetzt, ersetzt dieser Sensor die aktuelle Temperatur der Wetterentität (z.B.: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Falls gesetzt, ersetzt dieser Sensor die aktuelle Windgeschwindigkeit der Wetterentität (z.B.: sensor.ambient_wind_speed).",
+          "tsp": "Gewünschte Temperatur ({tsp_range})"
         }
       }
     }

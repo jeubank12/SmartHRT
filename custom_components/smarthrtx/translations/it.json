@@ -20,15 +20,31 @@
           "target_hour": "Ora obiettivo",
           "recoverycalc_hour": "Ora spegnimento riscaldamento",
           "sensor_interior_temperature": "Sensore temperatura interna",
+          "weather_entity": "Fonte meteo (previsioni + condizioni di fallback)",
+          "sensor_outdoor_temperature": "Sensore temperatura esterna (sostituzione opzionale)",
+          "sensor_wind_speed": "Sensore velocità vento (sostituzione opzionale)",
           "tsp": "Temperatura impostata (Set Point)"
         },
         "data_description": {
           "target_hour": "Ora di sveglia desiderata (es: 6:00)",
           "recoverycalc_hour": "Ora di spegnimento del riscaldamento la sera (es: 23:00)",
           "sensor_interior_temperature": "Sensore di temperatura della stanza (es: sensor.room_temperature)",
-          "tsp": "Temperatura desiderata (13-26°C)"
+          "weather_entity": "Integrazione meteo usata per le previsioni orarie e come fallback per le condizioni attuali (es: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Se impostato, questo sensore sostituisce la temperatura attuale dell'entità meteo (es: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Se impostato, questo sensore sostituisce la velocità del vento attuale dell'entità meteo (es: sensor.ambient_wind_speed).",
+          "tsp": "Temperatura desiderata ({tsp_range})"
         }
       }
+    },
+    "error": {
+      "weather_not_found": "Entità meteo non trovata",
+      "weather_incompatible": "L'entità meteo non supporta le previsioni",
+      "sensor_not_found": "Sensore di temperatura non trovato",
+      "tsp_out_of_range": "Temperatura fuori intervallo (13–26 °C)",
+      "tsp_out_of_range_f": "Temperatura fuori intervallo (55–79 °F)",
+      "invalid_time_sequence": "L'ora di spegnimento deve precedere l'ora obiettivo",
+      "invalid_name": "Nome non valido",
+      "unknown_error": "Errore di configurazione"
     }
   },
   "options": {
@@ -42,6 +58,9 @@
           "target_hour": "Ora obiettivo",
           "recoverycalc_hour": "Ora spegnimento riscaldamento",
           "sensor_interior_temperature": "Sensore temperatura interna",
+          "weather_entity": "Fonte meteo (previsioni + condizioni di fallback)",
+          "sensor_outdoor_temperature": "Sensore temperatura esterna (sostituzione opzionale)",
+          "sensor_wind_speed": "Sensore velocità vento (sostituzione opzionale)",
           "tsp": "Temperatura impostata (Set Point)"
         },
         "data_description": {
@@ -49,7 +68,10 @@
           "target_hour": "Ora di sveglia desiderata (es: 6:00)",
           "recoverycalc_hour": "Ora di spegnimento del riscaldamento la sera (es: 23:00)",
           "sensor_interior_temperature": "Sensore di temperatura della stanza (es: sensor.room_temperature)",
-          "tsp": "Temperatura desiderata (13-26°C)"
+          "weather_entity": "Integrazione meteo usata per le previsioni orarie e come fallback per le condizioni attuali (es: weather.home, weather.meteo_france).",
+          "sensor_outdoor_temperature": "Se impostato, questo sensore sostituisce la temperatura attuale dell'entità meteo (es: sensor.ambient_temperature).",
+          "sensor_wind_speed": "Se impostato, questo sensore sostituisce la velocità del vento attuale dell'entità meteo (es: sensor.ambient_wind_speed).",
+          "tsp": "Temperatura desiderata ({tsp_range})"
         }
       }
     }
